@@ -14,15 +14,20 @@ import java.util.List;
 /** Spend perk points (1 per level-up). Icons are plain in-game items. */
 public class PerksScreen extends Screen {
     private static final int W = 250;
-    private static final int ROW_H = 30;
+    private static final int ROW_H = 30;   // the least height of a row
     private static final int HEADER = 24;
-    private static final int FOOTER = 28;
-    private static final int FULL_H = HEADER + Perk.values().length * ROW_H + FOOTER;
+    private static final int FOOTER = 40;  // the key hint line, then the Back / Close buttons
     private static final int TRACK_W = 6; // the scroll bar on the right edge of the list
+    private static final int DESC_W = W - 86; // the width a perk's description wraps to
 
     private String lastSig = "";
     private final List<Button> buyButtons = new ArrayList<>();
     private int scroll;            // how many pixels the list is scrolled down
+    // Every row is as tall as its wrapped description needs, so a long description is never cut off.
+    private int[] rowY = new int[0];   // top of each row, relative to the top of the list
+    private int[] rowH = new int[0];
+    private List<List<FormattedCharSequence>> descLines = new ArrayList<>();
+    private int contentH;
     private boolean draggingBar;
 
     public PerksScreen() {
@@ -31,12 +36,28 @@ public class PerksScreen extends Screen {
 
     private int left() { return (width - W) / 2; }
     /** The whole window, shortened to fit when the screen is small (the list then scrolls). */
-    private int panelH() { return Math.min(FULL_H, Math.max(HEADER + FOOTER + ROW_H * 3, height - 16)); }
+    private int panelH() { return Math.min(HEADER + contentH + FOOTER, Math.max(HEADER + FOOTER + ROW_H * 3, height - 16)); }
     private int top() { return (height - panelH()) / 2; }
     private int viewH() { return panelH() - HEADER - FOOTER; }
-    private int contentH() { return Perk.values().length * ROW_H; }
-    private int maxScroll() { return Math.max(0, contentH() - viewH()); }
+    private int maxScroll() { return Math.max(0, contentH - viewH()); }
     private void clampScroll() { scroll = Math.max(0, Math.min(maxScroll(), scroll)); }
+
+    /** Wraps every description and works out each row's height and position. Needs the font, so it runs from init(). */
+    private void layoutRows() {
+        Perk[] perks = Perk.values();
+        rowY = new int[perks.length];
+        rowH = new int[perks.length];
+        descLines = new ArrayList<>();
+        int yy = 0;
+        for (int i = 0; i < perks.length; i++) {
+            List<FormattedCharSequence> lines = font.split(Component.literal(perks[i].description), DESC_W);
+            descLines.add(lines);
+            rowY[i] = yy;
+            rowH[i] = Math.max(ROW_H, 12 + lines.size() * 9 + 4); // title line, then the description lines
+            yy += rowH[i];
+        }
+        contentH = yy;
+    }
 
     /** Swap these for your own pixel art later. */
     static ItemStack iconFor(Perk perk) {
@@ -58,6 +79,7 @@ public class PerksScreen extends Screen {
     protected void init() {
         ScreenLoop.start();
         lastSig = ClientState.signature();
+        layoutRows();
         int x = left();
         int y = top();
         clampScroll();
@@ -66,13 +88,13 @@ public class PerksScreen extends Screen {
         for (int i = 0; i < perks.length; i++) {
             Perk perk = perks[i];
             int idx = i;
-            int ry = y + HEADER + i * ROW_H - scroll;
+            int ry = y + HEADER + rowY[i] - scroll;
             // Click = 1 rank, Shift+click = 5 ranks, Ctrl+click = as many as you can afford.
             Button buy = Button.builder(Component.literal("+"), btn -> {
                         int count = hasControlDown() ? 100 : hasShiftDown() ? 5 : 1;
                         Net.send(6, idx | (count << 8));
                     })
-                    .bounds(x + W - 40, ry + 5, 26, 20).build();
+                    .bounds(x + W - 40, ry + (rowH[i] - 20) / 2, 26, 20).build();
             buy.active = ClientState.points() > 0 && ClientState.rank(perk) < perk.maxRank;
             buyButtons.add(buy);
             addRenderableWidget(buy);
@@ -102,7 +124,7 @@ public class PerksScreen extends Screen {
     private int trackTop() { return top() + HEADER; }
 
     private int thumbH() {
-        return Math.max(16, (int) ((long) viewH() * viewH() / contentH()));
+        return Math.max(16, (int) ((long) viewH() * viewH() / Math.max(1, contentH)));
     }
 
     private int thumbY() {
@@ -187,18 +209,18 @@ public class PerksScreen extends Screen {
         Perk[] perks = Perk.values();
         for (int i = 0; i < perks.length; i++) {
             Perk perk = perks[i];
-            int ry = viewTop + i * ROW_H - scroll;
-            if (ry + ROW_H < viewTop || ry > viewBottom) continue;
-            g.fill(x + 6, ry + 1, x + W - 12, ry + ROW_H - 2, 0x40FFFFFF);
-            g.renderItem(iconFor(perk), x + 12, ry + 7);
+            int ry = viewTop + rowY[i] - scroll;
+            if (ry + rowH[i] < viewTop || ry > viewBottom) continue;
+            g.fill(x + 6, ry + 1, x + W - 12, ry + rowH[i] - 2, 0x40FFFFFF);
+            g.renderItem(iconFor(perk), x + 12, ry + (rowH[i] - 16) / 2);
 
             g.drawString(font, perk.title, x + 36, ry + 2, 0xFFFFFF, true);
             String rank = ClientState.rank(perk) + "/" + perk.maxRank;
             g.drawString(font, rank, x + W - 50 - font.width(rank), ry + 2,
                     ClientState.rank(perk) >= perk.maxRank ? 0x55FF55 : 0xBBBBBB, true);
 
-            List<FormattedCharSequence> lines = font.split(Component.literal(perk.description), W - 86);
-            for (int l = 0; l < Math.min(2, lines.size()); l++) {
+            List<FormattedCharSequence> lines = descLines.get(i); // every line, however many there are
+            for (int l = 0; l < lines.size(); l++) {
                 g.drawString(font, lines.get(l), x + 36, ry + 12 + l * 9, 0x999999, false);
             }
         }
@@ -207,7 +229,7 @@ public class PerksScreen extends Screen {
         // The + buttons follow their rows; a button that isn't fully inside the list is hidden.
         for (int i = 0; i < buyButtons.size(); i++) {
             Button b = buyButtons.get(i);
-            int by = viewTop + i * ROW_H - scroll + 5;
+            int by = viewTop + rowY[i] - scroll + (rowH[i] - b.getHeight()) / 2;
             b.setY(by);
             b.visible = by >= viewTop && by + b.getHeight() <= viewBottom;
         }
@@ -222,8 +244,11 @@ public class PerksScreen extends Screen {
             g.fill(tx + 1, ty, tx + TRACK_W - 1, ty + thumbH(), hot ? 0xFFDDDDDD : 0xFF9A9A9A);
         }
 
-        String hint = maxScroll() > 0 ? "Shift: +5   Ctrl: max   Scroll for more" : "Shift: +5   Ctrl: max";
-        g.drawString(font, hint, x + (W - font.width(hint)) / 2, y + h - 22, 0x777777, false);
+        // The hint sits on its own line above Back / Close so the buttons never cover it.
+        String hint = "Click +1   Shift +5   Ctrl max";
+        String withScroll = hint + "   Scroll for more";
+        if (maxScroll() > 0 && font.width(withScroll) <= W - 16) hint = withScroll;
+        g.drawString(font, hint, x + (W - font.width(hint)) / 2, y + h - 38, 0x777777, false);
 
         super.render(g, mouseX, mouseY, partialTick);
     }
