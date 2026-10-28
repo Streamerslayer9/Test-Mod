@@ -39,6 +39,9 @@ public class GulpConfig {
     /** The short action-bar messages when you do something (swallow, release, "too big", ...). */
     public static boolean actionMessages = true;
 
+    /** The helpful hover tooltips on Gulp's buttons and screens (Eat 1, Strip, payout, settings help...). Off hides them. */
+    public static boolean helpTooltips = true;
+
     /** Custom Player Models: drive the model's belly animations from your stomach (does nothing without CPM). */
     public static boolean cpmSliders = true;
     /** Names of the animations in your CPM model. Change them in config/gulp-client.properties. */
@@ -82,6 +85,7 @@ public class GulpConfig {
             showRoleTags = Boolean.parseBoolean(props.getProperty("showRoleTags", "true"));
             rightClickEat = Boolean.parseBoolean(props.getProperty("rightClickEat", "true"));
             cpmSliders = Boolean.parseBoolean(props.getProperty("cpmSliders", "true"));
+            helpTooltips = Boolean.parseBoolean(props.getProperty("helpTooltips", "true"));
             cpmBellyName = props.getProperty("cpmBellyName", "belly").trim();
             cpmMobsName = props.getProperty("cpmMobsName", "belly_mobs").trim();
             cpmItemsName = props.getProperty("cpmItemsName", "belly_items").trim();
@@ -105,6 +109,7 @@ public class GulpConfig {
             props.setProperty("showRoleTags", Boolean.toString(showRoleTags));
             props.setProperty("rightClickEat", Boolean.toString(rightClickEat));
             props.setProperty("cpmSliders", Boolean.toString(cpmSliders));
+            props.setProperty("helpTooltips", Boolean.toString(helpTooltips));
             props.setProperty("cpmBellyName", cpmBellyName);
             props.setProperty("cpmMobsName", cpmMobsName);
             props.setProperty("cpmItemsName", cpmItemsName);

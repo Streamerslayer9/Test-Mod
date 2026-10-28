@@ -6,13 +6,14 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-/** Client-side settings. Saved to config/gulp-client.properties. */
+/** Client-side settings. Saved to config/gulp-client.properties. All the ON/OFF switches live in TogglesScreen. */
 public class SettingsScreen extends Screen {
     private static final int W = 250;
-    private static final int H = 266;
+    private static final int H = 160;
 
-    private Button bellyButton, levelUpButton, actionButton, roleButton, perkMenuButton, cpmButton, instantButton, roleTagButton, rightClickButton;
+    private Button bellyButton, roleButton, perkMenuButton;
     private Role shownRole;
+    private boolean shownTips;
 
     public SettingsScreen() {
         super(Component.literal("Gulp Settings"));
@@ -23,19 +24,16 @@ public class SettingsScreen extends Screen {
 
     private void refresh() {
         bellyButton.setMessage(Component.literal("Belly style: " + GulpConfig.bellyStyle.label));
-        levelUpButton.setMessage(Component.literal("Level-up messages: " + (GulpConfig.levelUpMessages ? "ON" : "OFF")));
-        actionButton.setMessage(Component.literal("Action messages: " + (GulpConfig.actionMessages ? "ON" : "OFF")));
-        cpmButton.setMessage(Component.literal("CPM belly sliders: " + (GulpConfig.cpmSliders ? "ON" : "OFF")
-                + (CpmBridge.available() ? "" : " (CPM not found)")));
-        rightClickButton.setMessage(Component.literal("Right-click to eat: " + (GulpConfig.rightClickEat ? "ON" : "OFF")));
-        roleTagButton.setMessage(Component.literal("Role in name tags: " + (GulpConfig.showRoleTags ? "ON" : "OFF")));
-        instantButton.setMessage(Component.literal("Instant digest button: " + (ClientState.isInstantDigest() ? "ON" : "OFF")));
         perkMenuButton.setMessage(Component.literal("Perk menu: " + (GulpConfig.legacyPerkMenu ? "Legacy" : "New look")));
         Role role = ClientState.role();
         roleButton.setMessage(Component.literal("Role: ").append(Component.literal(role.label).withStyle(st -> st.withColor(role.color & 0xFFFFFF))));
-        if (role != shownRole) { // the tooltip is only rebuilt when the role changes
+        // the tooltip is only rebuilt when the role or the hover-tips setting changes
+        if (role != shownRole || shownTips != GulpConfig.helpTooltips) {
             shownRole = role;
-            roleButton.setTooltip(Tooltip.create(Component.literal(role.description + "\n\nClick to switch: Pred, Prey, Both, Neither.")));
+            shownTips = GulpConfig.helpTooltips;
+            roleButton.setTooltip(shownTips
+                    ? Tooltip.create(Component.literal(role.description + "\n\nClick to switch: Pred, Prey, Both, Neither."))
+                    : null);
         }
     }
 
@@ -51,68 +49,24 @@ public class SettingsScreen extends Screen {
             refresh();
         }).bounds(x + 15, y + 22, W - 30, 19).build();
 
-        levelUpButton = Button.builder(Component.empty(), btn -> {
-            GulpConfig.levelUpMessages = !GulpConfig.levelUpMessages;
-            GulpConfig.save();
-            refresh();
-        }).bounds(x + 15, y + 43, W - 30, 19).build();
-
         // Your role is kept on the server (it decides who can swallow whom), not in your local settings file.
         roleButton = Button.builder(Component.empty(), btn -> Net.send(8, ClientState.role().next().ordinal()))
-                .bounds(x + 15, y + 106, W - 30, 19).build();
-
-        // The short action-bar messages when you do something: Gulp! Swallowed Cow, Too big for your stomach, ...
-        actionButton = Button.builder(Component.empty(), btn -> {
-            GulpConfig.actionMessages = !GulpConfig.actionMessages;
-            GulpConfig.save();
-            refresh();
-        }).bounds(x + 15, y + 64, W - 30, 19).build();
+                .bounds(x + 15, y + 43, W - 30, 19).build();
 
         perkMenuButton = Button.builder(Component.empty(), btn -> {
             GulpConfig.legacyPerkMenu = !GulpConfig.legacyPerkMenu;
             GulpConfig.save();
             refresh();
-        }).bounds(x + 15, y + 127, W - 30, 19).build();
+        }).bounds(x + 15, y + 64, W - 30, 19).build();
 
-        // Custom Player Models: your model's belly animations follow how full you are.
-        cpmButton = Button.builder(Component.empty(), btn -> {
-            GulpConfig.cpmSliders = !GulpConfig.cpmSliders;
-            GulpConfig.save();
-            refresh();
-        }).bounds(x + 15, y + 148, W - 30, 19).build();
-
-        // Whether the Digest button shows next to each mob on the stomach screen. Kept on the server, off by default.
-        instantButton = Button.builder(Component.empty(), btn -> Net.send(17, ClientState.isInstantDigest() ? 0 : 1))
-                .bounds(x + 15, y + 169, W - 30, 19).build();
-        instantButton.setTooltip(Tooltip.create(Component.literal(
-                "Shows a Digest button next to each mob in your stomach that digests it right away. Off by default.")));
-        addRenderableWidget(instantButton);
-        // A coloured [Pred] / [Prey] / [Both] / [Neither] after every player's name above their head. Only on your screen.
-        roleTagButton = Button.builder(Component.empty(), btn -> {
-            GulpConfig.showRoleTags = !GulpConfig.showRoleTags;
-            GulpConfig.save();
-            ClientRoleTags.refreshAll();
-            refresh();
-        }).bounds(x + 15, y + 190, W - 30, 19).build();
-        addRenderableWidget(roleTagButton);
-        // Right-click an item in the stomach storage to eat it (hold = keep eating). Off gives the normal right-click back.
-        rightClickButton = Button.builder(Component.empty(), btn -> {
-            GulpConfig.rightClickEat = !GulpConfig.rightClickEat;
-            GulpConfig.save();
-            refresh();
-        }).bounds(x + 15, y + 211, W - 30, 19).build();
-        rightClickButton.setTooltip(Tooltip.create(Component.literal(
-                "Right-click an item in your stomach storage to eat it. Hold to keep eating, shift for the whole stack. "
-                + "Turn off to get the normal right-click back (picking up half a stack).")));
-        addRenderableWidget(rightClickButton);
         addRenderableWidget(bellyButton);
-        addRenderableWidget(cpmButton);
-        addRenderableWidget(actionButton);
-        addRenderableWidget(perkMenuButton);
         addRenderableWidget(roleButton);
-        addRenderableWidget(levelUpButton);
+        addRenderableWidget(perkMenuButton);
         addRenderableWidget(Button.builder(Component.literal("Sounds..."), btn -> this.minecraft.setScreen(new SoundsScreen()))
                 .bounds(x + 15, y + 85, W - 30, 19).build());
+        // All the ON/OFF switches: messages, name tags, right-click eat, CPM sliders, instant digest, hover tips.
+        addRenderableWidget(Button.builder(Component.literal("Toggles..."), btn -> this.minecraft.setScreen(new TogglesScreen()))
+                .bounds(x + 15, y + 106, W - 30, 19).build());
 
         // With a role that can't swallow there is no stomach menu, so Back just closes.
         addRenderableWidget(Button.builder(Component.literal("Back"), btn -> {
@@ -122,6 +76,7 @@ public class SettingsScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("Close"), btn -> onClose())
                 .bounds(x + W - 68, y + H - 28, 60, 20).build());
 
+        shownRole = null; // buttons were just rebuilt, so give the role button its tooltip again
         refresh();
     }
 

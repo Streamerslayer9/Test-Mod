@@ -72,20 +72,20 @@ public final class ClientScreenEvents {
         });
         ref[0] = destroy;
         destroy.active = rank >= 1;
-        destroy.setTooltip(Tooltip.create(Component.literal(rank < 1
+        destroy.setTooltip(tip(rank < 1
                 ? "Needs the Enchant Stripper perk (stomach level 50)."
-                : "Permanently delete all enchantments on the item in the first box. Nothing is made. Click twice to confirm.")));
+                : "Permanently delete all enchantments on the item in the first box. Nothing is made. Click twice to confirm."));
         e.addListener(destroy);
         strip.active = rank >= 1;
         transfer.active = rank >= 1 && !ClientState.isHard();
-        strip.setTooltip(Tooltip.create(Component.literal(rank < 1
+        strip.setTooltip(tip(rank < 1
                 ? "Needs the Enchant Stripper perk (stomach level 50)."
-                : "Strip the enchantments off the gear in the first box onto a plain book in the second box (the book is used up). Levels lost per enchantment: " + lost + ".")));
-        transfer.setTooltip(Tooltip.create(Component.literal(rank < 1
+                : "Strip the enchantments off the gear in the first box onto a plain book in the second box (the book is used up). Levels lost per enchantment: " + lost + "."));
+        transfer.setTooltip(tip(rank < 1
                 ? "Needs the Enchant Stripper perk (stomach level 50)."
                 : ClientState.isHard()
                 ? "Soft mode only."
-                : "Move the enchantments from the first box onto the item in the second box. Levels lost per enchantment: " + lost + ".")));
+                : "Move the enchantments from the first box onto the item in the second box. Levels lost per enchantment: " + lost + "."));
         e.addListener(strip);
         e.addListener(transfer);
 
@@ -96,11 +96,16 @@ public final class ClientScreenEvents {
         int right = screen.getGuiLeft() + screen.getXSize() - 7;
         // The buttons ALWAYS say "Eat", whatever the item is (food, blocks, gear, junk).
         Button digest64 = new SmallTextButton(right - bw, by, bw, bh, Component.literal("Eat 64"), btn -> Net.send(10, 64));
-        digest64.setTooltip(Tooltip.create(Component.literal("Eat up to 64 of the item in the first slot. Or just right-click any item in the storage to eat it (hold to keep eating, shift for the whole stack).")));
+        digest64.setTooltip(tip("Eat up to 64 of the item in the first slot. Or just right-click any item in the storage to eat it (hold to keep eating, shift for the whole stack)."));
         Button digest1 = new SmallTextButton(right - bw * 2 - 2, by, bw, bh, Component.literal("Eat 1"), btn -> Net.send(10, 1));
-        digest1.setTooltip(Tooltip.create(Component.literal("Eat 1 of the item in the first slot. Or just right-click any item in the storage to eat it.")));
+        digest1.setTooltip(tip("Eat 1 of the item in the first slot. Or just right-click any item in the storage to eat it."));
         e.addListener(digest1);
         e.addListener(digest64);
+    }
+
+    /** A hover tooltip for a button, or null (no tooltip) when the player turned the help tips off in Settings > Toggles. */
+    private static Tooltip tip(String text) {
+        return GulpConfig.helpTooltips ? Tooltip.create(Component.literal(text)) : null;
     }
 
     /** A vanilla button whose label is drawn a little smaller, so "Eat 64" fits inside the small button. */
@@ -241,8 +246,11 @@ public final class ClientScreenEvents {
             g.renderItemDecorations(font, stack, bx + 4, by + 4);
         }
         if (mx >= bx && mx < bx + BOX && my >= by && my < by + BOX) {
-            if (stack.isEmpty()) g.renderTooltip(font, Component.literal(empty), mx, my);
-            else g.renderTooltip(font, stack, mx, my);
+            if (!stack.isEmpty()) {
+                g.renderTooltip(font, stack, mx, my); // the item's own tooltip always shows
+            } else if (GulpConfig.helpTooltips) {
+                g.renderTooltip(font, Component.literal(empty), mx, my);
+            }
         }
     }
 
@@ -285,7 +293,7 @@ public final class ClientScreenEvents {
         int fill = (int) ((w - 2) * Math.min(1f, progress / (float) threshold));
         g.fill(x + 1, by + 1, x + 1 + fill, by + 3, 0xFF5DB85D);
 
-        if (e.getMouseX() >= x && e.getMouseX() <= x + w && e.getMouseY() >= y && e.getMouseY() <= by + 4) {
+        if (GulpConfig.helpTooltips && e.getMouseX() >= x && e.getMouseX() <= x + w && e.getMouseY() >= y && e.getMouseY() <= by + 4) {
             float bars = StomachItems.hungerBars(ClientState.rank(Perk.UNIVERSAL));
             String tip = String.format("Eats %d items to restore hunger. Current Payout: %.1f Hunger Bars per %d items.",
                     threshold, bars, threshold);
