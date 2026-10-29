@@ -40,7 +40,7 @@ import java.util.UUID;
  * crash can never leave anyone stuck in spectator mode.
  */
 public final class PlayerHolding {
-    private static final String KEY_PREV_MODE = "gulp_prev_mode";
+    static final String KEY_PREV_MODE = "gulp_prev_mode"; // also used by VillagerHolding
 
     /** One swallowed player. `hard` is decided when they are swallowed and never changes while they are inside. */
     private static final class Held {
@@ -70,7 +70,8 @@ public final class PlayerHolding {
 
     private PlayerHolding() { }
 
-    public static boolean isHeld(ServerPlayer p) { return HELD.containsKey(p.getUUID()); }
+    /** True if the player is swallowed by another player or held by a villager. */
+    public static boolean isHeld(ServerPlayer p) { return HELD.containsKey(p.getUUID()) || VillagerHolding.isHeld(p); }
 
     public static boolean isPlayerEntry(CompoundTag entry) { return entry.contains("PlayerUuid"); }
 
@@ -176,6 +177,10 @@ public final class PlayerHolding {
 
     /** The swallowed player pressed Release. In soft mode they get out; in hard mode they have to struggle instead. */
     public static void tryRelease(ServerPlayer victim) {
+        if (VillagerHolding.isHeld(victim)) {
+            VillagerHolding.tryRelease(victim);
+            return;
+        }
         Held held = HELD.get(victim.getUUID());
         if (held == null) return;
         if (held.hard) {
@@ -187,6 +192,10 @@ public final class PlayerHolding {
 
     /** Gets a swallowed player out, whatever the swallower is doing (struggle success, soft-mode Release, safety releases). */
     public static void escape(ServerPlayer victim) {
+        if (VillagerHolding.isHeld(victim)) {
+            VillagerHolding.release(victim, "You were let out.", false);
+            return;
+        }
         Held held = HELD.get(victim.getUUID());
         if (held == null) return;
         MinecraftServer server = victim.getServer();
@@ -207,6 +216,7 @@ public final class PlayerHolding {
 
     /** Called every tick for every player: keeps a swallowed player inside, and lets them out if something went wrong. */
     public static void tickHeld(ServerPlayer victim) {
+        VillagerHolding.tick(victim); // a villager holding them to comfort them
         Held held = HELD.get(victim.getUUID());
         if (held == null) return;
         if (held.struggleCd > 0) held.struggleCd--;
@@ -329,6 +339,10 @@ public final class PlayerHolding {
      * "[Name] squirms in your gut" when it fails. Soft mode: it is a wall rub instead.
      */
     public static void struggle(ServerPlayer victim) {
+        if (VillagerHolding.isHeld(victim)) {
+            VillagerHolding.rub(victim);
+            return;
+        }
         Held held = HELD.get(victim.getUUID());
         if (held == null || held.struggleCd > 0) return;
         held.struggleCd = 20;
@@ -452,6 +466,7 @@ public final class PlayerHolding {
     }
 
     public static void onServerStopping(MinecraftServer server) {
+        VillagerHolding.releaseAll(server);
         for (UUID id : new ArrayList<>(HELD.keySet())) {
             ServerPlayer victim = server.getPlayerList().getPlayer(id);
             if (victim != null) escape(victim);

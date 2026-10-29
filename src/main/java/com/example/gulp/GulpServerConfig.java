@@ -39,6 +39,7 @@ public final class GulpServerConfig {
     public static final ForgeConfigSpec.IntValue MCA_AFFECTION_HEARTS;
     public static final ForgeConfigSpec.IntValue MCA_REQUEST_COOLDOWN_SECONDS;
     public static final ForgeConfigSpec.BooleanValue MCA_STATUS_MESSAGE;
+    public static final ForgeConfigSpec.BooleanValue MCA_COMFORT_ENABLED;
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -146,6 +147,10 @@ public final class GulpServerConfig {
         MCA_REQUEST_COOLDOWN_SECONDS = b
                 .comment("How long a villager waits before asking to be carried again.")
                 .defineInRange("mcaRequestCooldownSeconds", 600, 30, 36000);
+        MCA_COMFORT_ENABLED = b
+                .comment("A pred villager who likes you enough (mcaAffectionHearts) may offer to hold a hurt player in their tummy until they are healed.",
+                        "Only players whose role is Prey or Both are ever asked, they have to press Accept, and they can climb out any time (soft mode only).")
+                .define("mcaComfortEnabled", true);
         MCA_STATUS_MESSAGE = b
                 .comment("Test/dev helper: when a player joins, show a chat line saying whether this mod connected to Minecraft Comes Alive.",
                         "Set to false to turn it off once you've confirmed it works.")

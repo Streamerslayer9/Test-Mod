@@ -639,6 +639,90 @@ public final class McaIntegration {
         }
     }
 
+    // ------------------------------------------------------------------ comforting a hurt player
+
+    private static final Map<UUID, Offer> COMFORT_OFFERS = new HashMap<>();
+    private static final Map<UUID, Long> COMFORT_VILLAGER_COOLDOWN = new HashMap<>();
+    private static final Map<UUID, Long> COMFORT_PLAYER_COOLDOWN = new HashMap<>();
+
+    /** Changes a villager's hearts with a player (used when a villager has held someone). */
+    static void addHearts(Entity villager, ServerPlayer player, int hearts) {
+        if (active() && isVillager(villager)) reward(villager, player, hearts);
+    }
+
+    /**
+     * Every 5 seconds: a hurt player (under half health) whose role can be swallowed (Prey or Both), with a pred villager
+     * within 6 blocks who likes them enough, is offered a rest in that villager's tummy. They have to press Accept.
+     */
+    public static void tickComfort(MinecraftServer server) {
+        if (!GulpServerConfig.MCA_COMFORT_ENABLED.get() || !active()) return;
+        long now = server.getTickCount();
+        COMFORT_OFFERS.values().removeIf(o -> o.expires() <= now);
+        COMFORT_VILLAGER_COOLDOWN.values().removeIf(t -> t <= now);
+        COMFORT_PLAYER_COOLDOWN.values().removeIf(t -> t <= now);
+        StomachManager mgr = StomachManager.get(server);
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            if (!p.isAlive() || p.isSpectator() || PlayerHolding.isHeld(p) || COMFORT_OFFERS.containsKey(p.getUUID())
+                    || COMFORT_PLAYER_COOLDOWN.containsKey(p.getUUID())) continue;
+            if (p.getHealth() > p.getMaxHealth() * 0.5f) continue; // only when hurt
+            if (!mgr.of(p.getUUID()).role.canBeEaten()) continue;   // being swallowed is the player's own choice: Prey or Both
+            for (Entity e : p.level().getEntities(p, p.getBoundingBox().inflate(6), McaIntegration::isVillager)) {
+                if (!(e instanceof LivingEntity le) || !le.isAlive() || isProtectedChild(le)
+                        || COMFORT_VILLAGER_COOLDOWN.containsKey(le.getUUID()) || voreTypeOf(le) != VoreType.PRED) continue;
+                if (heartsWith(le, p) < GulpServerConfig.MCA_AFFECTION_HEARTS.get()) continue;
+                makeComfortOffer(p, le, attitude(le), now);
+                break;
+            }
+        }
+    }
+
+    private static void makeComfortOffer(ServerPlayer p, LivingEntity villager, Attitude a, long now) {
+        COMFORT_OFFERS.put(p.getUUID(), new Offer(villager.getUUID(), now + 600)); // 30 seconds to answer
+        COMFORT_VILLAGER_COOLDOWN.put(villager.getUUID(), now + GulpServerConfig.MCA_REQUEST_COOLDOWN_SECONDS.get() * 20L);
+        COMFORT_PLAYER_COOLDOWN.put(p.getUUID(), now + 2400); // at most one offer per player every two minutes
+        String text = switch (a) {
+            case FAN -> "Whoa, you're hurt! Come here, let me patch you up in my tummy!";
+            case FEARFUL -> "Um... you look hurt. Would you like to rest inside me for a bit? I'll be careful...";
+            case NEUTRAL -> "You look hurt. Would you like to rest in my tummy until you feel better?";
+        };
+        MutableComponent accept = Component.literal("[Accept]").withStyle(Style.EMPTY
+                .withColor(net.minecraft.ChatFormatting.GREEN).withBold(true)
+                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/gulp comfort accept"))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Rest safely until you're healed. You can climb out any time."))));
+        MutableComponent decline = Component.literal("[Decline]").withStyle(Style.EMPTY
+                .withColor(net.minecraft.ChatFormatting.RED).withBold(true)
+                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/gulp comfort decline"))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("No thank you"))));
+        p.sendSystemMessage(Component.literal("<").append(villager.getName()).append("> " + text + " ")
+                .append(accept).append(" ").append(decline));
+        p.playNotifySound(SoundEvents.VILLAGER_YES, SoundSource.NEUTRAL, 1f, 1f);
+    }
+
+    /** The player answered a comfort offer (clicked a button or typed /gulp comfort accept|decline). */
+    public static void respondComfort(ServerPlayer p, boolean accept) {
+        Offer offer = COMFORT_OFFERS.remove(p.getUUID());
+        long now = p.getServer().getTickCount();
+        if (offer == null || offer.expires() <= now) {
+            p.sendSystemMessage(Component.literal("Nobody is waiting for an answer."));
+            return;
+        }
+        Entity e = p.serverLevel().getEntity(offer.villager());
+        if (!(e instanceof LivingEntity le) || !le.isAlive() || p.distanceToSqr(le) > 64.0) {
+            p.sendSystemMessage(Component.literal("They've wandered off."));
+            return;
+        }
+        if (!accept) {
+            p.sendSystemMessage(Component.literal("<").append(le.getName()).append("> Of course. I'm here if you change your mind."));
+            return;
+        }
+        if (PlayerHolding.isHeld(p) || p.isSpectator()) return;
+        if (!StomachManager.get(p.getServer()).of(p.getUUID()).role.canBeEaten()) {
+            StomachLogic.say(p, Component.literal("Your role can't be swallowed. Set it to Prey or Both in Settings first."));
+            return;
+        }
+        VillagerHolding.hold(p, le);
+    }
+
     /** /gulp villagers: every villager within 24 blocks (nearest first, at most 20) with their kind, hearts and distance. */
     public static void listNearby(ServerPlayer p) {
         p.sendSystemMessage(Component.literal("[Gulp] villagers nearby:").withStyle(ChatFormatting.AQUA));

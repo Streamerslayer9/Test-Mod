@@ -85,6 +85,16 @@ public final class ServerEvents {
                     McaIntegration.listNearby(c.getSource().getPlayerOrException());
                     return 1;
                 }))
+                // /gulp comfort accept|decline: the answer to a villager who offered to hold you while you heal
+                .then(Commands.literal("comfort")
+                        .then(Commands.literal("accept").executes(c -> {
+                            McaIntegration.respondComfort(c.getSource().getPlayerOrException(), true);
+                            return 1;
+                        }))
+                        .then(Commands.literal("decline").executes(c -> {
+                            McaIntegration.respondComfort(c.getSource().getPlayerOrException(), false);
+                            return 1;
+                        })))
                 // /gulp carry accept|decline: the answer to a villager who asked to be carried
                 .then(Commands.literal("carry")
                         .then(Commands.literal("accept").executes(c -> {
@@ -137,6 +147,7 @@ public final class ServerEvents {
         var server = ServerLifecycleHooks.getCurrentServer();
         if (server != null && server.getTickCount() % 10 == 0) McaIntegration.tickScared(server);
         if (server != null && server.getTickCount() % 100 == 0) McaIntegration.tickAffection(server);
+        if (server != null && server.getTickCount() % 100 == 20) McaIntegration.tickComfort(server);
         // Re-send the role list every 5 seconds (tiny packet): a player who joined, or whose client built a name tag before the
         // list arrived, always catches up. This is what makes the badges reliable in multiplayer.
         if (server != null && server.getTickCount() % 100 == 50) RolesPacket.broadcast(server);
