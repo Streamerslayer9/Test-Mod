@@ -80,6 +80,11 @@ public final class ServerEvents {
                     McaIntegration.debugNearest(c.getSource().getPlayerOrException());
                     return 1;
                 }))
+                // /gulp villagers: the kind of every villager nearby
+                .then(Commands.literal("villagers").executes(c -> {
+                    McaIntegration.listNearby(c.getSource().getPlayerOrException());
+                    return 1;
+                }))
                 // /gulp carry accept|decline: the answer to a villager who asked to be carried
                 .then(Commands.literal("carry")
                         .then(Commands.literal("accept").executes(c -> {

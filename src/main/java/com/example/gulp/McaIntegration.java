@@ -61,6 +61,16 @@ public final class McaIntegration {
 
     private enum Attitude { FAN, NEUTRAL, FEARFUL }
 
+    /**
+     * Whether a villager is a pred, a prey or just normal. Worked out from their UUID, so it never changes and needs nothing saved.
+     * Together with their MCA personality (Attitude: confident / easygoing / shy) that gives every villager a kind, like "pred, shy".
+     * The mix: about 1 in 4 is a pred, 1 in 4 is a prey and the other half are normal (see voreTypeOf).
+     *  NORMAL  villagers act exactly as they did before this existed.
+     *  PREY    villagers are more open to being carried: even shy ones can ask, once they trust you enough.
+     *  PRED    villagers never ask to be carried (they would rather do the carrying; eating the player comes later).
+     */
+    private enum VoreType { NORMAL, PREY, PRED }
+
     private static Boolean modLoaded;
     private static boolean broken; // MCA looked different from what we expected: stop trying
     private static Class<?> villagerClass;
@@ -183,6 +193,24 @@ public final class McaIntegration {
             problem("couldn't read a villager's personality", t);
             return "";
         }
+    }
+
+    private static VoreType voreTypeOf(Entity villager) {
+        return switch (Math.floorMod(villager.getUUID().hashCode() * 31 + 7, 4)) {
+            case 0 -> VoreType.PRED;
+            case 1 -> VoreType.PREY;
+            default -> VoreType.NORMAL; // 2 and 3: half of all villagers
+        };
+    }
+
+    /** "pred, shy" / "prey, confident" / "normal, easygoing": what kind of villager this is, for /gulp villagerinfo. */
+    private static String voreKind(Entity villager) {
+        String temper = switch (attitude(villager)) {
+            case FAN -> "confident";
+            case FEARFUL -> "shy";
+            case NEUTRAL -> "easygoing";
+        };
+        return voreTypeOf(villager).name().toLowerCase(java.util.Locale.ROOT) + ", " + temper;
     }
 
     private static boolean guard(Entity villager) {
@@ -542,9 +570,12 @@ public final class McaIntegration {
                 if (!(e instanceof LivingEntity le) || !le.isAlive() || isProtectedChild(le)
                         || VILLAGER_COOLDOWN.containsKey(le.getUUID())) continue;
                 Attitude a = attitude(le);
-                if (a == Attitude.FEARFUL) continue;
-                if (heartsWith(le, p) < GulpServerConfig.MCA_AFFECTION_HEARTS.get()) continue;
-                if (p.getRandom().nextFloat() > (a == Attitude.FAN ? 0.5f : 0.25f)) continue;
+                VoreType type = voreTypeOf(le);
+                if (type == VoreType.PRED) continue; // preds don't ask to be carried
+                if (a == Attitude.FEARFUL && type != VoreType.PREY) continue; // shy villagers who aren't prey types never ask, as before
+                int needHearts = GulpServerConfig.MCA_AFFECTION_HEARTS.get() * (a == Attitude.FEARFUL ? 2 : 1); // shy villagers need to trust you twice as much
+                if (heartsWith(le, p) < needHearts) continue;
+                if (p.getRandom().nextFloat() > (a == Attitude.FAN ? 0.5f : a == Attitude.FEARFUL ? 0.1f : 0.25f)) continue;
                 float size = Math.max(0.05f, le.getBbWidth() * le.getBbWidth() * le.getBbHeight());
                 if (size > s.capacity() || s.used() + size > s.capacity() || s.contents.size() >= Stomach.MAX_MOBS) continue;
                 makeOffer(p, le, a, memoryCount(le, p.getUUID(), "gulp.swallowed") > 0, now);
@@ -608,6 +639,31 @@ public final class McaIntegration {
         }
     }
 
+    /** /gulp villagers: every villager within 24 blocks (nearest first, at most 20) with their kind, hearts and distance. */
+    public static void listNearby(ServerPlayer p) {
+        p.sendSystemMessage(Component.literal("[Gulp] villagers nearby:").withStyle(ChatFormatting.AQUA));
+        if (!active()) {
+            p.sendSystemMessage(Component.literal("- MCA integration is off or didn't match MCA (see latest.log).").withStyle(ChatFormatting.YELLOW));
+            return;
+        }
+        List<Entity> found = new ArrayList<>(p.level().getEntities(p, p.getBoundingBox().inflate(24), McaIntegration::isVillager));
+        if (found.isEmpty()) {
+            p.sendSystemMessage(Component.literal("- No MCA villager within 24 blocks.").withStyle(ChatFormatting.YELLOW));
+            return;
+        }
+        found.sort(java.util.Comparator.comparingDouble((Entity v) -> p.distanceToSqr(v)));
+        int shown = 0;
+        for (Entity e : found) {
+            if (++shown > 20) {
+                p.sendSystemMessage(Component.literal("...and " + (found.size() - 20) + " more."));
+                break;
+            }
+            p.sendSystemMessage(Component.literal("- ").append(e.getName()).append(
+                    " | " + voreKind(e) + " | hearts " + heartsWith(e, p) + " | " + Math.round(p.distanceTo(e)) + " blocks"
+                    + (isProtectedChild(e) ? " | child" : "")));
+        }
+    }
+
     /** /gulp villagerinfo: tells you why the nearest villager isn't asking to be carried (or that they would). */
     public static void debugNearest(ServerPlayer p) {
         Stomach s = StomachManager.get(p.getServer()).of(p.getUUID());
@@ -638,10 +694,13 @@ public final class McaIntegration {
             int need = GulpServerConfig.MCA_AFFECTION_HEARTS.get();
             Attitude a = attitude(le);
             p.sendSystemMessage(Component.literal("Nearest: ").append(le.getName()).append(
-                    " | personality " + personalityOf(le) + " (" + a + ") | hearts " + hearts + " (needs " + need + ")"
+                    " | personality " + personalityOf(le) + " (" + a + ") | kind " + voreKind(le) + " | hearts " + hearts + " (needs " + need + ")"
                     + " | child: " + isProtectedChild(le)));
             if (isProtectedChild(le)) why.add("They are a child: never asked, never swallowed.");
-            if (a == Attitude.FEARFUL) why.add("Fearful personalities never ask.");
+            VoreType type = voreTypeOf(le);
+            if (type == VoreType.PRED) why.add("They are a pred type: preds don't ask to be carried.");
+            if (a == Attitude.FEARFUL && type != VoreType.PREY) why.add("Shy villagers only ask if they are a prey type.");
+            if (a == Attitude.FEARFUL) need *= 2; // shy prey need to trust you twice as much
             if (hearts < need) why.add("Hearts " + hearts + " is below " + need + ". Talk to them or give gifts, or lower mcaAffectionHearts.");
             Long vc = VILLAGER_COOLDOWN.get(le.getUUID());
             if (vc != null && vc > now) why.add("They asked recently: wait " + (vc - now) / 20 + "s.");
