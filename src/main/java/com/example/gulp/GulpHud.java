@@ -55,6 +55,15 @@ public final class GulpHud {
             right(g, mc, "Perk points: " + ClientState.points()
                     + " [" + ClientModEvents.SCREEN_KEY.getTranslatedKeyMessage().getString() + "]", rightEdge, y - 24, 0xFFE64A);
         }
+        if (!ClientState.usesGulpSwallow()) {
+            // Flamevore is doing the swallowing: no capacity bar and no Soft / Hard mode, just the level and its XP bar.
+            right(g, mc, "Stomach Lv." + ClientState.level(), rightEdge, y - 12, 0xFFFFFF);
+            int xp = (int) (w * (ClientState.xp() / (float) Math.max(1, ClientState.xpNeeded())));
+            g.fill(x - 1, y - 1, x + w + 1, y + 4, 0xFF000000);
+            g.fill(x, y, x + w, y + 3, 0xFF222222);
+            g.fill(x, y, x + xp, y + 3, 0xFFE6C84A);
+            return;
+        }
         right(g, mc, "Stomach Lv." + ClientState.level() + (ClientState.isHard() ? "  [HARD]" : "  [SOFT]"), rightEdge, y - 12, 0xFFFFFF);
 
         g.fill(x - 1, y - 1, x + w + 1, y + 9, 0xFF000000);

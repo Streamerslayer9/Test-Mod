@@ -24,6 +24,7 @@ public final class ClientRoleTags {
     public static void onNameFormat(PlayerEvent.NameFormat e) {
         Player p = e.getEntity();
         if (!p.level().isClientSide || !GulpConfig.showRoleTags) return; // the integrated server's copy of you is left alone
+        if (!ClientState.usesGulpSwallow()) return; // Flamevore is doing the swallowing, so roles aren't shown
         Role role = ClientState.roleOf(p.getUUID());
         if (role == null) return; // the server hasn't told us this player's role (yet)
         e.setDisplayname(Component.empty().append(e.getDisplayname()).append(" ")

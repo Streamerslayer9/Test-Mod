@@ -33,7 +33,8 @@ public final class FlamevoreKeyBlock {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onClientTick(TickEvent.ClientTickEvent e) {
         if (e.phase != TickEvent.Phase.START) return; // the start of the tick, ahead of anything that reads keys
-        if (!FlamevoreCompat.isLoaded() || ClientState.swallowSystem() == SwallowSystem.FLAMEVORE) return;
+        // Needs Flamevore here (it has the key) and on the server (the server decides who may use it).
+        if (!FlamevoreCompat.isLoaded() || !ClientState.flamevoreActive() || ClientState.swallowSystem() == SwallowSystem.FLAMEVORE) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
         if (eatKeys == null) eatKeys = findEatKeys(mc);

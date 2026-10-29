@@ -26,6 +26,8 @@ public final class ClientState {
     private static float heldChance;
     private static Role role = Role.PRED;
     private static SwallowSystem swallowSystem = SwallowSystem.UNSET;
+    /** Whether the SERVER has Flamevore. The server decides, so a modded client on a server without Flamevore just plays Gulp. */
+    private static boolean serverFlamevore;
     /** True once the server has sent us the first stomach sync of this session. */
     private static boolean synced;
     /** Everyone's role, from the server (for the "point at a player" badge). */
@@ -52,6 +54,7 @@ public final class ClientState {
         role = Role.byId(m.role) != null ? Role.byId(m.role) : Role.PRED;
         SwallowSystem system = SwallowSystem.byId(m.swallowSystem);
         swallowSystem = system != null ? system : SwallowSystem.UNSET;
+        serverFlamevore = m.flamevoreOnServer;
         synced = true;
         predator = m.predator;
         itemFill = m.itemFill;
@@ -95,6 +98,7 @@ public final class ClientState {
         points = 0;
         role = Role.PRED;
         swallowSystem = SwallowSystem.UNSET;
+        serverFlamevore = false;
         synced = false;
         roles.clear();
         heldMode = 0;
@@ -119,12 +123,15 @@ public final class ClientState {
 
     /** True when Gulp does the swallowing for this player (always without Flamevore). Same rule as Stomach.usesGulpSwallow(). */
     public static boolean usesGulpSwallow() {
-        return !FlamevoreCompat.isLoaded() || swallowSystem == SwallowSystem.GULP;
+        return !serverFlamevore || swallowSystem == SwallowSystem.GULP;
     }
+
+    /** True when the server has Flamevore, so there is a Gulp / Flamevore choice to make. */
+    public static boolean flamevoreActive() { return serverFlamevore; }
 
     /** True when Flamevore is installed and this player hasn't picked a swallowing system yet (and the server has told us so). */
     public static boolean needsSwallowChoice() {
-        return synced && FlamevoreCompat.isLoaded() && swallowSystem == SwallowSystem.UNSET;
+        return synced && serverFlamevore && swallowSystem == SwallowSystem.UNSET;
     }
 
     public static void setHeld(int mode, String holder, float progress, float chance) {

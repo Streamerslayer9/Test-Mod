@@ -30,7 +30,7 @@ public class SettingsScreen extends Screen {
         bellyButton.setMessage(Component.literal("Belly style: " + GulpConfig.bellyStyle.label));
         perkMenuButton.setMessage(Component.literal("Perk menu: " + (GulpConfig.legacyPerkMenu ? "Legacy" : "New look")));
         swallowButton.setMessage(Component.literal(swallowLabel()));
-        swallowButton.active = FlamevoreCompat.isLoaded(); // nothing to choose between without Flamevore
+        swallowButton.active = ClientState.flamevoreActive(); // nothing to choose between without Flamevore on the server
         Role role = ClientState.role();
         roleButton.setMessage(Component.literal("Role: ").append(Component.literal(role.label).withStyle(st -> st.withColor(role.color & 0xFFFFFF))));
         // the tooltip is only rebuilt when the role or the hover-tips setting changes
@@ -45,7 +45,7 @@ public class SettingsScreen extends Screen {
     }
 
     private static String swallowLabel() {
-        if (!FlamevoreCompat.isLoaded()) return "Swallowing: Gulp (Flamevore not found)";
+        if (!ClientState.flamevoreActive()) return "Swallowing: Gulp (Flamevore not found)";
         SwallowSystem system = ClientState.swallowSystem();
         return "Swallowing: " + (system == SwallowSystem.UNSET ? "choose..." : system.label);
     }
@@ -68,7 +68,7 @@ public class SettingsScreen extends Screen {
 
         // Which mod does the swallowing (only changeable when Flamevore is installed). Kept on the server like your role.
         swallowButton = Button.builder(Component.empty(), btn -> {
-            if (!FlamevoreCompat.isLoaded()) return;
+            if (!ClientState.flamevoreActive()) return;
             if (ClientState.needsSwallowChoice()) {
                 this.minecraft.setScreen(new SwallowChoiceScreen());
             } else {

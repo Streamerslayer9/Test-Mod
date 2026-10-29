@@ -9,7 +9,7 @@ import java.util.Optional;
 
 /** Network channel + the three packets: action (client->server), sync and belly (server->client). */
 public final class Net {
-    private static final String PROTOCOL = "2"; // 2: the stomach sync carries the swallowing system, so old and new versions refuse to connect
+    private static final String PROTOCOL = "3"; // 3: the stomach sync carries the swallowing system and whether the server has Flamevore, so old and new versions refuse to connect
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(Gulp.ID, "main"), () -> PROTOCOL, PROTOCOL::equals, PROTOCOL::equals);
 

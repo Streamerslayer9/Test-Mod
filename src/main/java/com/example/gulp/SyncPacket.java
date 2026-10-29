@@ -17,6 +17,7 @@ public class SyncPacket {
     public int level, xp, xpNeeded, points;
     public int role;
     public int swallowSystem;
+    public boolean flamevoreOnServer; // the server decides whether the Gulp / Flamevore choice exists
     public int predator;
     public float itemFill;
     public int digestProgress;
@@ -38,6 +39,7 @@ public class SyncPacket {
         m.points = s.points;
         m.role = s.role.ordinal();
         m.swallowSystem = s.swallowSystem.ordinal();
+        m.flamevoreOnServer = FlamevoreCompat.isLoaded();
         m.predator = s.predator;
         m.itemFill = s.usesGulpSwallow() ? s.itemFill() : 0f; // no belly growth when Flamevore does the swallowing
         m.digestProgress = s.digestProgress;
@@ -66,6 +68,7 @@ public class SyncPacket {
         buf.writeInt(m.points);
         buf.writeByte(m.role);
         buf.writeByte(m.swallowSystem);
+        buf.writeBoolean(m.flamevoreOnServer);
         buf.writeInt(m.predator);
         buf.writeFloat(m.itemFill);
         buf.writeInt(m.digestProgress);
@@ -97,6 +100,7 @@ public class SyncPacket {
         m.points = buf.readInt();
         m.role = buf.readByte();
         m.swallowSystem = buf.readByte();
+        m.flamevoreOnServer = buf.readBoolean();
         m.predator = buf.readInt();
         m.itemFill = buf.readFloat();
         m.digestProgress = buf.readInt();
