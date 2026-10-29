@@ -255,6 +255,8 @@ shares any animation.
   Settings > Swallowing. It is saved per player on the server (Stomach.swallowSystem, action 19).
 - Flamevore chosen: Gulp's mob and player eating (V), the Gulp belly growth and MCA carry offers are off. Item swallowing,
   stomach level, perks and item storage still work. Switching to Flamevore lets out anything Gulp was holding.
+- Gulp chosen (or nothing chosen yet): Flamevore's eat key (X by default) is switched off by FlamevoreKeyBlock, which uses up
+  its presses at the start of each client tick. The key it finds is logged as "[Gulp] Flamevore key" in latest.log.
 - Until a player has chosen, V opens the choice screen. We never edit Flamevore: we only read what it does and react to it.
 - The network protocol version is now "2", so a client and server on different Gulp versions refuse to connect.
 
