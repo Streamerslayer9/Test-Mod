@@ -248,8 +248,9 @@ shares any animation.
   stand-ins in src/cpmApi (never put in the jar), so the mod builds without CPM and the real CPM classes are used at runtime.
 
 ## Swallowing system (Flamevore)
-- Only matters when the Flamevore mod is installed (FlamevoreCompat.MOD_ID, default "flamevore": confirm it against Flamevore's
-  mods.toml). Without Flamevore nothing changes and Gulp does all the swallowing.
+- Only matters when the Flamevore mod is installed. FlamevoreCompat finds it by the word "flamevore" in a mod's id or display
+  name and writes what it found (or the list of installed mod ids) to latest.log. Without Flamevore nothing changes and Gulp does
+  all the swallowing.
 - With Flamevore, each player picks who does the swallowing on first join (SwallowChoiceScreen), and can switch later in
   Settings > Swallowing. It is saved per player on the server (Stomach.swallowSystem, action 19).
 - Flamevore chosen: Gulp's mob and player eating (V), the Gulp belly growth and MCA carry offers are off. Item swallowing,
