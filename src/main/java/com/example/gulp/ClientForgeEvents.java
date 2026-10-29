@@ -17,10 +17,14 @@ import net.minecraftforge.fml.common.Mod;
 public final class ClientForgeEvents {
     private ClientForgeEvents() { }
 
+    /** The swallowing-system choice screen is opened by itself once per login (V and Settings reopen it). */
+    private static boolean choicePrompted;
+
     /** Leaving a world or server: stop the music and forget the old stomach so it doesn't leak into the next one. */
     @SubscribeEvent
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut e) {
         ClientState.reset();
+        choicePrompted = false;
         CpmDriver.reset();
         ScreenLoop.stop();
     }
@@ -54,7 +58,17 @@ public final class ClientForgeEvents {
         }
         CpmDriver.tick(); // Custom Player Models belly sliders (does nothing without CPM)
 
+        // Flamevore installed and no choice made yet: ask which mod should do the swallowing.
+        if (!choicePrompted && mc.screen == null && ClientState.needsSwallowChoice()) {
+            choicePrompted = true;
+            mc.setScreen(new SwallowChoiceScreen());
+        }
+
         while (ClientModEvents.SWALLOW_KEY.consumeClick()) {
+            if (ClientState.needsSwallowChoice()) { // nothing to swallow with until they choose
+                if (mc.screen == null) mc.setScreen(new SwallowChoiceScreen());
+                continue;
+            }
             // Use what the player actually sees on their screen, so wandering mobs and lag don't cause misses.
             Entity target = TargetFinder.find(mc.player, TargetFinder.REACH);
             Net.send(0, target == null ? -1 : target.getId());

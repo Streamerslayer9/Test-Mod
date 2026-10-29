@@ -63,7 +63,7 @@ Install Minecraft Forge for 1.20.1, then put gulp-0.1.0.jar in the mods folder. 
   distance of 8 blocks). One request per target at a time, and after a decline the same player can't ask again for 60 seconds.
 - Role in name tags: every player's name tag above their head also shows a coloured badge, e.g. "Streamerslayer9 [Prey]" (client side
   only: ClientRoleTags, via the NameFormat event; refreshed whenever the role list arrives). Colours: Pred red, Prey aqua, Both gold,
-  Neither grey. Switch: "Role in name tags" in Settings (showRoleTags in config/gulp-client.properties).
+  Neither grey. Switch: "Role in name tags" in Settings > Toggles (showRoleTags in config/gulp-client.properties).
 - Role tags in multiplayer: the server re-sends the role list every 5 seconds (RolesPacket.broadcast, also on join and on every role
   change) and the client rebuilds name tags once a second, so a badge never gets stuck missing. Debug: /gulproles (client side) lists every
   player this client sees and the role it knows for them.
@@ -111,12 +111,12 @@ Install Minecraft Forge for 1.20.1, then put gulp-0.1.0.jar in the mods folder. 
   not while a menu or chat is open). Allowed when the server config devLevelUpKey is true (the default for now), or for operators.
   Set devLevelUpKey to false before releasing.
 - Instant digest toggle: the Digest button next to each mob on the stomach screen is OFF by default. Each player turns it on in
-  Settings ("Instant digest button"). It is saved with the stomach (older saves start with it off) and the server refuses the digest
+  Settings > Toggles ("Instant digest button"). It is saved with the stomach (older saves start with it off) and the server refuses the digest
   action while it is off, not just the button. Hard-mode digestion over time is not affected. Code: Stomach.instantDigest, action 17.
 - Right-click to eat: on the stomach storage screen, right-clicking an item in the storage (cursor empty, not the Enchant Stripper
   boxes) eats that exact item instead of only the first slot; holding right-click keeps eating one every 2 ticks after a short pause, and
   shift + right-click eats the whole stack (up to 64). It goes through the same rules as the Eat buttons (breakable gear is broken down,
-  everything else counts toward Iron Gut). Client switch: "Right-click to eat" in Settings (rightClickEat in config/gulp-client.properties);
+  everything else counts toward Iron Gut). Client switch: "Right-click to eat" in Settings > Toggles (rightClickEat in config/gulp-client.properties);
   off gives the normal right-click back (picking up half a stack). The server action is 18 (StomachItems.digestSlot).
   The Eat 1 / Eat 64 buttons (first slot) now keep an item there: when the first slot is eaten empty (or was already empty), every item
   moves forward so the next one is in the first slot, in the same order, so spamming Eat 64 eats the whole storage
@@ -145,7 +145,7 @@ Install Minecraft Forge for 1.20.1, then put gulp-0.1.0.jar in the mods folder. 
 ## Visible belly
 The belly of every player model swells forward as their stomach fills (using the player's own skin).
 Other players see it too. Settings > Belly style switches between Classic (whole torso) and Stomach only.
-Settings > Action messages turns the short action-bar messages (Gulp! Swallowed Cow, Too big for your stomach, mode
+Settings > Toggles > Action messages turns the short action-bar messages (Gulp! Swallowed Cow, Too big for your stomach, mode
 changes, struggle warnings ...) on or off. Level-up messages are a separate setting. Messages telling a swallowed player
 they were swallowed and how to get out are always shown.
 Tweak MAX_EXTRA_DEPTH / MAX_EXTRA_WIDTH in BellyLayer.java for how far it sticks out, and
@@ -237,7 +237,7 @@ shares any animation.
   Use any of them, or all three. Each is set between 0 and the maximum the model allows for that animation (the mod reads the
   maximum from the model, so any range works). An animation the model doesn't have is skipped. Values ease toward their
   target, so the belly grows and shrinks smoothly.
-- Names can be changed in config/gulp-client.properties (cpmBellyName, cpmMobsName, cpmItemsName). Settings > CPM belly
+- Names can be changed in config/gulp-client.properties (cpmBellyName, cpmMobsName, cpmItemsName). Settings > Toggles > CPM belly
   sliders switches it off; Settings > Belly style > "Off (my model has one)" turns off the built-in bulge. If your own model
   has a "belly" animation, the built-in bulge steps aside for you automatically.
 - Capital letters don't matter: CPM itself treats "Belly" and "belly" as different names, so the mod tries each name in a few
@@ -247,10 +247,29 @@ shares any animation.
 - How it's built: CPM finds the @CPMPlugin class (CpmPlugin) by itself. The few CPM signatures used are compiled against
   stand-ins in src/cpmApi (never put in the jar), so the mod builds without CPM and the real CPM classes are used at runtime.
 
+## Swallowing system (Flamevore)
+- Only matters when the Flamevore mod is installed (FlamevoreCompat.MOD_ID, default "flamevore": confirm it against Flamevore's
+  mods.toml). Without Flamevore nothing changes and Gulp does all the swallowing.
+- With Flamevore, each player picks who does the swallowing on first join (SwallowChoiceScreen), and can switch later in
+  Settings > Swallowing. It is saved per player on the server (Stomach.swallowSystem, action 19).
+- Flamevore chosen: Gulp's mob and player eating (V), the Gulp belly growth and MCA carry offers are off. Item swallowing,
+  stomach level, perks and item storage still work. Switching to Flamevore lets out anything Gulp was holding.
+- Until a player has chosen, V opens the choice screen. We never edit Flamevore: we only read what it does and react to it.
+- The network protocol version is now "2", so a client and server on different Gulp versions refuse to connect.
+
+## Settings screen
+- Settings has Belly style, Role, Swallowing, Perk menu, Sounds... and Toggles... (SettingsScreen.java).
+- Settings > Toggles (TogglesScreen.java) holds every ON/OFF switch: Level-up messages, Action messages, Role in name tags,
+  Right-click to eat, CPM belly sliders, Instant digest button (server-saved, see below) and Hover help tips.
+- Hover help tips (helpTooltips in config/gulp-client.properties, default ON) hides the explanatory hover text on Gulp's buttons and
+  screens (Eat 1 / Eat 64, Strip / Transfer / Destroy, the Digestion Progress payout, the empty Enchant Stripper boxes, and the
+  Settings help). Real item tooltips are never hidden. With it OFF, the "Needs the Enchant Stripper perk" hint on greyed-out buttons is
+  hidden too. Code: GulpConfig.helpTooltips, ClientScreenEvents.tip().
+
 ## Multiplayer
 - Everyone (server and every player) needs the mod installed. It is Forge 1.20.1 and works on dedicated servers.
 - Each player has their own stomach, saved with the world. Other players see your belly and hear your sounds.
-- Settings (belly style, sounds, volumes, level-up messages, action messages, perk menu) are per player and saved on
+- Settings (belly style, sounds, volumes, perk menu and everything under Toggles) are per player and saved on
   that player's computer.
 - Pets are protected: you can't swallow another player's tamed animal or horse.
 - Dead and spectating players can't use the stomach; if you die, everything inside is let out.

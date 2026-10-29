@@ -9,9 +9,13 @@ import net.minecraft.network.chat.Component;
 /** Client-side settings. Saved to config/gulp-client.properties. All the ON/OFF switches live in TogglesScreen. */
 public class SettingsScreen extends Screen {
     private static final int W = 250;
-    private static final int H = 160;
+    private static final int H = 182;
 
-    private Button bellyButton, roleButton, perkMenuButton;
+    private static final String SWALLOW_TIP =
+            "Which mod does your swallowing. Gulp: eat mobs and players with V and your belly grows. Flamevore: Flamevore does it; "
+            + "Gulp's mob eating and belly are off, but item swallowing, level, perks and item storage stay.";
+
+    private Button bellyButton, roleButton, swallowButton, perkMenuButton;
     private Role shownRole;
     private boolean shownTips;
 
@@ -25,6 +29,8 @@ public class SettingsScreen extends Screen {
     private void refresh() {
         bellyButton.setMessage(Component.literal("Belly style: " + GulpConfig.bellyStyle.label));
         perkMenuButton.setMessage(Component.literal("Perk menu: " + (GulpConfig.legacyPerkMenu ? "Legacy" : "New look")));
+        swallowButton.setMessage(Component.literal(swallowLabel()));
+        swallowButton.active = FlamevoreCompat.isLoaded(); // nothing to choose between without Flamevore
         Role role = ClientState.role();
         roleButton.setMessage(Component.literal("Role: ").append(Component.literal(role.label).withStyle(st -> st.withColor(role.color & 0xFFFFFF))));
         // the tooltip is only rebuilt when the role or the hover-tips setting changes
@@ -34,7 +40,14 @@ public class SettingsScreen extends Screen {
             roleButton.setTooltip(shownTips
                     ? Tooltip.create(Component.literal(role.description + "\n\nClick to switch: Pred, Prey, Both, Neither."))
                     : null);
+            swallowButton.setTooltip(shownTips ? Tooltip.create(Component.literal(SWALLOW_TIP)) : null);
         }
+    }
+
+    private static String swallowLabel() {
+        if (!FlamevoreCompat.isLoaded()) return "Swallowing: Gulp (Flamevore not found)";
+        SwallowSystem system = ClientState.swallowSystem();
+        return "Swallowing: " + (system == SwallowSystem.UNSET ? "choose..." : system.label);
     }
 
     @Override
@@ -53,20 +66,31 @@ public class SettingsScreen extends Screen {
         roleButton = Button.builder(Component.empty(), btn -> Net.send(8, ClientState.role().next().ordinal()))
                 .bounds(x + 15, y + 43, W - 30, 19).build();
 
+        // Which mod does the swallowing (only changeable when Flamevore is installed). Kept on the server like your role.
+        swallowButton = Button.builder(Component.empty(), btn -> {
+            if (!FlamevoreCompat.isLoaded()) return;
+            if (ClientState.needsSwallowChoice()) {
+                this.minecraft.setScreen(new SwallowChoiceScreen());
+            } else {
+                Net.send(19, (ClientState.usesGulpSwallow() ? SwallowSystem.FLAMEVORE : SwallowSystem.GULP).ordinal());
+            }
+        }).bounds(x + 15, y + 64, W - 30, 19).build();
+
         perkMenuButton = Button.builder(Component.empty(), btn -> {
             GulpConfig.legacyPerkMenu = !GulpConfig.legacyPerkMenu;
             GulpConfig.save();
             refresh();
-        }).bounds(x + 15, y + 64, W - 30, 19).build();
+        }).bounds(x + 15, y + 85, W - 30, 19).build();
 
         addRenderableWidget(bellyButton);
         addRenderableWidget(roleButton);
+        addRenderableWidget(swallowButton);
         addRenderableWidget(perkMenuButton);
         addRenderableWidget(Button.builder(Component.literal("Sounds..."), btn -> this.minecraft.setScreen(new SoundsScreen()))
-                .bounds(x + 15, y + 85, W - 30, 19).build());
+                .bounds(x + 15, y + 106, W - 30, 19).build());
         // All the ON/OFF switches: messages, name tags, right-click eat, CPM sliders, instant digest, hover tips.
         addRenderableWidget(Button.builder(Component.literal("Toggles..."), btn -> this.minecraft.setScreen(new TogglesScreen()))
-                .bounds(x + 15, y + 106, W - 30, 19).build());
+                .bounds(x + 15, y + 127, W - 30, 19).build());
 
         // With a role that can't swallow there is no stomach menu, so Back just closes.
         addRenderableWidget(Button.builder(Component.literal("Back"), btn -> {

@@ -16,6 +16,7 @@ public class SyncPacket {
     public boolean instantDigest;
     public int level, xp, xpNeeded, points;
     public int role;
+    public int swallowSystem;
     public int predator;
     public float itemFill;
     public int digestProgress;
@@ -36,8 +37,9 @@ public class SyncPacket {
         m.cap = (float) s.capacity();
         m.points = s.points;
         m.role = s.role.ordinal();
+        m.swallowSystem = s.swallowSystem.ordinal();
         m.predator = s.predator;
-        m.itemFill = s.itemFill();
+        m.itemFill = s.usesGulpSwallow() ? s.itemFill() : 0f; // no belly growth when Flamevore does the swallowing
         m.digestProgress = s.digestProgress;
         m.strip0 = s.stripSlots.get(0).copy();
         m.strip1 = s.stripSlots.get(1).copy();
@@ -63,6 +65,7 @@ public class SyncPacket {
         buf.writeFloat(m.cap);
         buf.writeInt(m.points);
         buf.writeByte(m.role);
+        buf.writeByte(m.swallowSystem);
         buf.writeInt(m.predator);
         buf.writeFloat(m.itemFill);
         buf.writeInt(m.digestProgress);
@@ -93,6 +96,7 @@ public class SyncPacket {
         m.cap = buf.readFloat();
         m.points = buf.readInt();
         m.role = buf.readByte();
+        m.swallowSystem = buf.readByte();
         m.predator = buf.readInt();
         m.itemFill = buf.readFloat();
         m.digestProgress = buf.readInt();

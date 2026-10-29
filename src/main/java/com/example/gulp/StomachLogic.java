@@ -176,6 +176,32 @@ public final class StomachLogic {
                     StomachItems.digestSlot(p, s, view, arg & 0xFFFF, ((arg >> 16) & 1) != 0 ? 64 : 1);
                 }
             }
+            case 19 -> {
+                // First-join choice / Settings: which mod does the swallowing (arg = SwallowSystem ordinal).
+                SwallowSystem choice = SwallowSystem.byId(arg);
+                if (choice == null || choice == SwallowSystem.UNSET) {
+                    // nothing to set
+                } else if (!FlamevoreCompat.isLoaded()) {
+                    say(p, Component.literal("Flamevore isn't installed, so Gulp does the swallowing."));
+                } else if (choice != s.swallowSystem) {
+                    s.swallowSystem = choice;
+                    if (choice == SwallowSystem.FLAMEVORE) {
+                        // Gulp stops holding anyone: whatever is inside is let out (same as changing to a role that can't swallow).
+                        boolean any = false;
+                        Iterator<CompoundTag> it = s.contents.iterator();
+                        while (it.hasNext()) {
+                            if (release(p, it.next())) {
+                                it.remove();
+                                any = true;
+                            }
+                        }
+                        if (any) sound(p, GulpSound.SPIT);
+                        say(p, Component.literal("Swallowing system: Flamevore. Gulp's mob eating and belly are off; your level, perks and item storage stay."));
+                    } else {
+                        say(p, Component.literal("Swallowing system: Gulp."));
+                    }
+                }
+            }
             case 17 -> {
                 // Settings: turn the instant Digest button on (arg 1) or off (arg 0).
                 s.instantDigest = arg != 0;
@@ -277,7 +303,11 @@ public final class StomachLogic {
         }
         if (target == null) target = TargetFinder.find(p, TargetFinder.REACH);
         if (target instanceof ItemEntity item) {
-            swallowItem(p, s, item);
+            swallowItem(p, s, item); // item swallowing works whichever system is chosen
+            return;
+        }
+        if (!s.usesGulpSwallow()) {
+            say(p, notGulpSwallowMessage(s));
             return;
         }
         if (target instanceof ServerPlayer victim) {
@@ -308,6 +338,10 @@ public final class StomachLogic {
      * Children are never swallowed. @return true if it was swallowed
      */
     static boolean swallowLiving(ServerPlayer p, Stomach s, LivingEntity le, boolean safe) {
+        if (!s.usesGulpSwallow()) {
+            say(p, notGulpSwallowMessage(s));
+            return false;
+        }
         if (McaIntegration.isProtectedChild(le)) {
             say(p, Component.empty().append(le.getName()).append(" is a child and can never be swallowed."));
             return false;
@@ -350,6 +384,14 @@ public final class StomachLogic {
         s.contents.add(entry);
         finishSwallow(p, s, displayName);
         return true;
+    }
+
+    /** Why Gulp isn't swallowing mobs or players for this player right now. */
+    static Component notGulpSwallowMessage(Stomach s) {
+        if (s.swallowSystem == SwallowSystem.UNSET) {
+            return Component.literal("Choose your swallowing system first (press V, or open Settings).");
+        }
+        return Component.literal("Flamevore is doing your swallowing. Switch to Gulp in Settings to eat mobs with Gulp.");
     }
 
     /** Starts the swallow cooldown, plays the sound and shows the message. */
@@ -769,7 +811,7 @@ public final class StomachLogic {
         Net.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), SyncPacket.from(s));
 
         // Tell this player and everyone who can see them how full the belly is.
-        float ratio = (float) Math.min(1.0, s.used() / s.capacity());
+        float ratio = s.usesGulpSwallow() ? (float) Math.min(1.0, s.used() / s.capacity()) : 0f; // no belly when Flamevore swallows
         Net.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> p), new BellyPacket(p.getUUID(), ratio));
     }
 }

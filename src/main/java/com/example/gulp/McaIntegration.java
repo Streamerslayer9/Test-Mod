@@ -537,7 +537,7 @@ public final class McaIntegration {
             if (p.isSpectator() || PlayerHolding.isHeld(p) || OFFERS.containsKey(p.getUUID())
                     || PLAYER_COOLDOWN.containsKey(p.getUUID())) continue;
             Stomach s = mgr.of(p.getUUID());
-            if (!s.role.canEat() || (s.hard && GulpServerConfig.HARD_MODE_ENABLED.get())) continue;
+            if (!s.role.canEat() || !s.usesGulpSwallow() || (s.hard && GulpServerConfig.HARD_MODE_ENABLED.get())) continue;
             for (Entity e : p.level().getEntities(p, p.getBoundingBox().inflate(6), McaIntegration::isVillager)) {
                 if (!(e instanceof LivingEntity le) || !le.isAlive() || isProtectedChild(le)
                         || VILLAGER_COOLDOWN.containsKey(le.getUUID())) continue;
@@ -593,6 +593,10 @@ public final class McaIntegration {
             return;
         }
         Stomach s = StomachManager.get(p.getServer()).of(p.getUUID());
+        if (!s.usesGulpSwallow()) {
+            StomachLogic.say(p, StomachLogic.notGulpSwallowMessage(s));
+            return;
+        }
         if (!s.role.canEat() || (s.hard && GulpServerConfig.HARD_MODE_ENABLED.get())) {
             StomachLogic.say(p, Component.literal("Switch to soft mode (and a role that can swallow) first. Rides by invitation are always safe."));
             return;
@@ -612,6 +616,7 @@ public final class McaIntegration {
         if (!GulpServerConfig.MCA_AFFECTION_ENABLED.get()) why.add("mcaAffectionEnabled is false in the config.");
         if (!active()) why.add("MCA integration is off or didn't match MCA (see latest.log).");
         if (!s.role.canEat()) why.add("Your role is " + s.role.label + ", which can't swallow.");
+        if (!s.usesGulpSwallow()) why.add("Gulp isn't your swallowing system (Settings > Swallowing).");
         if (s.hard && GulpServerConfig.HARD_MODE_ENABLED.get()) why.add("You're in hard mode: requests only come in soft mode.");
         if (OFFERS.containsKey(p.getUUID())) why.add("A request is already waiting for your answer.");
         Long pc = PLAYER_COOLDOWN.get(p.getUUID());

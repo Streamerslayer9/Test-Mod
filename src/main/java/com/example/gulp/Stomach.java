@@ -46,6 +46,18 @@ public class Stomach {
     /** The two Enchant Stripper boxes on the storage screen: 0 = source (enchanted gear), 1 = target. Saved with the stomach. */
     public final NonNullList<ItemStack> stripSlots = NonNullList.withSize(2, ItemStack.EMPTY);
 
+    /** Which mod does the swallowing when Flamevore is installed too (see SwallowSystem). Chosen on first join. */
+    public SwallowSystem swallowSystem = SwallowSystem.UNSET;
+
+    /**
+     * True when Gulp itself handles eating mobs and players for this player (and the belly grows).
+     * Always true without Flamevore. With Flamevore it needs the player to have picked Gulp, so it is also false
+     * until they have chosen. Item swallowing, levels, perks and item storage never depend on this.
+     */
+    public boolean usesGulpSwallow() {
+        return !FlamevoreCompat.isLoaded() || swallowSystem == SwallowSystem.GULP;
+    }
+
     /** Role badge: who can swallow whom. Pred by default (you can swallow, nobody can swallow you). See Role. */
     public Role role = Role.PRED;
 
@@ -187,6 +199,7 @@ public class Stomach {
         for (Perk p : Perk.values()) perks.putInt(p.name(), ranks[p.ordinal()]);
         nbt.put("Perks", perks);
         nbt.putString("Role", role.name());
+        nbt.putString("SwallowSystem", swallowSystem.name());
         nbt.putBoolean("InstantDigest", instantDigest);
         nbt.putInt("Predator", predator);
         nbt.putInt("DigestProgress", digestProgress);
@@ -208,6 +221,8 @@ public class Stomach {
         Role saved = nbt.contains("Role") ? Role.byName(nbt.getString("Role")) : null;
         s.role = saved != null ? saved : (nbt.getBoolean("AllowSwallowed") ? Role.BOTH : Role.PRED);
         s.instantDigest = nbt.getBoolean("InstantDigest"); // missing in older saves = off
+        SwallowSystem savedSystem = nbt.contains("SwallowSystem") ? SwallowSystem.byName(nbt.getString("SwallowSystem")) : null;
+        s.swallowSystem = savedSystem != null ? savedSystem : SwallowSystem.UNSET; // older saves: asked on first join if Flamevore is installed
         s.predator = Math.max(0, nbt.getInt("Predator"));
         s.digestProgress = Math.max(0, Math.min(StomachItems.DIGEST_THRESHOLD - 1, nbt.getInt("DigestProgress")));
         ContainerHelper.loadAllItems(nbt.getCompound("Storage"), s.storage);

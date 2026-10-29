@@ -25,6 +25,9 @@ public final class ClientState {
     private static float heldProgress;
     private static float heldChance;
     private static Role role = Role.PRED;
+    private static SwallowSystem swallowSystem = SwallowSystem.UNSET;
+    /** True once the server has sent us the first stomach sync of this session. */
+    private static boolean synced;
     /** Everyone's role, from the server (for the "point at a player" badge). */
     private static final java.util.Map<java.util.UUID, Role> roles = new java.util.HashMap<>();
     private static int predator;
@@ -47,6 +50,9 @@ public final class ClientState {
         cap = m.cap;
         points = m.points;
         role = Role.byId(m.role) != null ? Role.byId(m.role) : Role.PRED;
+        SwallowSystem system = SwallowSystem.byId(m.swallowSystem);
+        swallowSystem = system != null ? system : SwallowSystem.UNSET;
+        synced = true;
         predator = m.predator;
         itemFill = m.itemFill;
         digestProgress = m.digestProgress;
@@ -88,6 +94,8 @@ public final class ClientState {
         xpNeeded = Stomach.xpForNext(1);
         points = 0;
         role = Role.PRED;
+        swallowSystem = SwallowSystem.UNSET;
+        synced = false;
         roles.clear();
         heldMode = 0;
         predator = 0;
@@ -107,6 +115,17 @@ public final class ClientState {
     public static boolean isHard() { return hard; }
     public static boolean isInstantDigest() { return instantDigest; }
     public static Role role() { return role; }
+    public static SwallowSystem swallowSystem() { return swallowSystem; }
+
+    /** True when Gulp does the swallowing for this player (always without Flamevore). Same rule as Stomach.usesGulpSwallow(). */
+    public static boolean usesGulpSwallow() {
+        return !FlamevoreCompat.isLoaded() || swallowSystem == SwallowSystem.GULP;
+    }
+
+    /** True when Flamevore is installed and this player hasn't picked a swallowing system yet (and the server has told us so). */
+    public static boolean needsSwallowChoice() {
+        return synced && FlamevoreCompat.isLoaded() && swallowSystem == SwallowSystem.UNSET;
+    }
 
     public static void setHeld(int mode, String holder, float progress, float chance) {
         heldMode = mode;
