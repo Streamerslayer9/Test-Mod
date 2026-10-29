@@ -46,5 +46,6 @@ public class Gulp {
 
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(Net::register);
+        event.enqueueWork(FlamevoreBridge::register); // Flamevore digests give Gulp XP (does nothing without Flamevore)
     }
 }
