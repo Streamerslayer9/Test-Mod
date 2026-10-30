@@ -55,6 +55,12 @@ public final class VillagerHolding {
     /** HP healed every second at this level. */
     static float healPerSecond(int level) { return 1.0f + 0.25f * (level - 1); }
 
+    /** The same with the villager's trait: confident preds heal faster. */
+    static float healPerSecond(int level, VillagerTrait trait) { return healPerSecond(level) * trait.healMult; }
+
+    /** The same with the villager's trait: shy preds hold you longer. */
+    static int maxTicks(int level, VillagerTrait trait) { return Math.round(maxTicks(level) * trait.holdMult); }
+
     /** How long one comfort can last at this level, in ticks: a minute at level 1, 6 seconds longer for every level after. */
     static int maxTicks(int level) { return (60 + 6 * (level - 1)) * 20; }
 
@@ -131,6 +137,7 @@ public final class VillagerHolding {
                 " is holding you in their tummy to help you heal. Press your Release key (default G) to get out whenever you like,"
                 + " or your Struggle key (default R) to rub the walls."));
         Net.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), new HeldPacket(1, villager.getName().getString(), 0f, 0f));
+        p.sendSystemMessage(Component.literal("<").append(villager.getName()).append("> " + McaIntegration.traitOf(villager).holdLine()));
         return true;
     }
 
@@ -147,15 +154,16 @@ public final class VillagerHolding {
         }
         if (p.getCamera() != v) p.setCamera(v); // pressing sneak would make a spectator stop looking through their eyes
         int level = levelOf(v);
+        VillagerTrait trait = McaIntegration.traitOf(v);
         if (h.ticks % 20 == 0) {
             float before = p.getHealth();
-            p.heal(healPerSecond(level));
+            p.heal(healPerSecond(level, trait));
             h.healed += Math.max(0f, p.getHealth() - before);
             if (level >= 5) p.getFoodData().eat(1, 0.2f); // a well-practised villager feeds you too
         }
         if (p.getHealth() >= p.getMaxHealth()) {
             release(p, "All better. You were let out.", true);
-        } else if (h.ticks >= maxTicks(level)) {
+        } else if (h.ticks >= maxTicks(level, trait)) {
             release(p, "You were let out.", true);
         }
     }
@@ -211,6 +219,13 @@ public final class VillagerHolding {
         }
         Net.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), new HeldPacket(0, "", 0f, 0f));
         p.sendSystemMessage(Component.literal(message));
+        if (villager != null && message.equals("You climbed out.")) {
+            VillagerTrait trait = McaIntegration.traitOf(villager);
+            p.sendSystemMessage(Component.literal("<").append(villager.getName()).append("> " + trait.earlyExitLine()));
+        } else if (villager != null && thanked) {
+            VillagerTrait trait = McaIntegration.traitOf(villager);
+            p.sendSystemMessage(Component.literal("<").append(villager.getName()).append("> " + trait.finishLine()));
+        }
     }
 
     /** The server is stopping: let everyone out first. */

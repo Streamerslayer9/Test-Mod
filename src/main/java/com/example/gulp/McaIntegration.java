@@ -213,8 +213,26 @@ public final class McaIntegration {
         };
     }
 
+    /**
+     * A pred or prey villager's temper (shy or confident); NONE for normal villagers. Taken from their MCA personality,
+     * and for the personalities in between from their UUID, so it never changes and needs nothing saved.
+     */
+    static VillagerTrait traitOf(Entity villager) {
+        if (voreTypeOf(villager) == VoreType.NORMAL) return VillagerTrait.NONE;
+        return switch (attitude(villager)) {
+            case FAN -> VillagerTrait.CONFIDENT;
+            case FEARFUL -> VillagerTrait.SHY;
+            case NEUTRAL -> ((villager.getUUID().getLeastSignificantBits() >>> 20) & 1L) == 0L
+                    ? VillagerTrait.CONFIDENT : VillagerTrait.SHY;
+        };
+    }
+
     /** "pred, shy" / "prey, confident" / "normal, easygoing": what kind of villager this is, for /gulp villagerinfo. */
     private static String voreKind(Entity villager) {
+        VillagerTrait trait = traitOf(villager);
+        if (trait != VillagerTrait.NONE) {
+            return voreTypeOf(villager).name().toLowerCase(java.util.Locale.ROOT) + ", " + trait.label.toLowerCase(java.util.Locale.ROOT);
+        }
         String temper = switch (attitude(villager)) {
             case FAN -> "confident";
             case FEARFUL -> "shy";
@@ -583,6 +601,8 @@ public final class McaIntegration {
                 Attitude a = attitude(le);
                 VoreType type = voreTypeOf(le);
                 if (type == VoreType.PRED) continue; // preds don't ask to be carried
+                // a prey villager is always either shy or confident (see traitOf), and that decides how they ask
+                if (type == VoreType.PREY) a = traitOf(le) == VillagerTrait.SHY ? Attitude.FEARFUL : Attitude.FAN;
                 if (a == Attitude.FEARFUL && type != VoreType.PREY) continue; // shy villagers who aren't prey types never ask, as before
                 int needHearts = GulpServerConfig.MCA_AFFECTION_HEARTS.get() * (a == Attitude.FEARFUL ? 2 : 1); // shy villagers need to trust you twice as much
                 if (heartsWith(le, p) < needHearts) continue;
@@ -667,8 +687,9 @@ public final class McaIntegration {
             case PRED -> 2;
         };
         int level = VillagerHolding.levelOf(e);
+        int trait = traitOf(e).ordinal();
         net.minecraftforge.network.PacketDistributor.PacketTarget target = net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> p);
-        Net.CHANNEL.send(target, new VillagerInfoPacket(entityId, type, level, VillagerHolding.xpOf(e), VillagerHolding.xpNeeded(level)));
+        Net.CHANNEL.send(target, new VillagerInfoPacket(entityId, type, trait, level, VillagerHolding.xpOf(e), VillagerHolding.xpNeeded(level)));
     }
 
     /** " | comfort lv 3" for pred villagers (they are the ones who comfort), nothing for the rest. */
@@ -695,27 +716,26 @@ public final class McaIntegration {
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (!p.isAlive() || p.isSpectator() || PlayerHolding.isHeld(p) || COMFORT_OFFERS.containsKey(p.getUUID())
                     || COMFORT_PLAYER_COOLDOWN.containsKey(p.getUUID())) continue;
-            if (p.getHealth() > p.getMaxHealth() * 0.5f) continue; // only when hurt
+            if (p.getHealth() > p.getMaxHealth() * VillagerTrait.CONFIDENT.comfortHpFraction) continue; // only when hurt (confident preds offer first, at 60%)
             if (!mgr.of(p.getUUID()).role.canBeEaten()) continue;   // being swallowed is the player's own choice: Prey or Both
             for (Entity e : p.level().getEntities(p, p.getBoundingBox().inflate(6), McaIntegration::isVillager)) {
                 if (!(e instanceof LivingEntity le) || !le.isAlive() || isProtectedChild(le)
                         || COMFORT_VILLAGER_COOLDOWN.containsKey(le.getUUID()) || voreTypeOf(le) != VoreType.PRED) continue;
-                if (heartsWith(le, p) < GulpServerConfig.MCA_AFFECTION_HEARTS.get()) continue;
-                makeComfortOffer(p, le, attitude(le), now);
+                VillagerTrait trait = traitOf(le);
+                if (p.getHealth() > p.getMaxHealth() * trait.comfortHpFraction) continue; // shy preds wait until you are worse off
+                if (heartsWith(le, p) < Math.round(GulpServerConfig.MCA_AFFECTION_HEARTS.get() * trait.heartsMult)) continue;
+                makeComfortOffer(p, le, trait, now);
                 break;
             }
         }
     }
 
-    private static void makeComfortOffer(ServerPlayer p, LivingEntity villager, Attitude a, long now) {
+    private static void makeComfortOffer(ServerPlayer p, LivingEntity villager, VillagerTrait trait, long now) {
         COMFORT_OFFERS.put(p.getUUID(), new Offer(villager.getUUID(), now + 600)); // 30 seconds to answer
-        COMFORT_VILLAGER_COOLDOWN.put(villager.getUUID(), now + GulpServerConfig.MCA_REQUEST_COOLDOWN_SECONDS.get() * 20L);
+        COMFORT_VILLAGER_COOLDOWN.put(villager.getUUID(),
+                now + Math.round(GulpServerConfig.MCA_REQUEST_COOLDOWN_SECONDS.get() * 20L * trait.cooldownMult));
         COMFORT_PLAYER_COOLDOWN.put(p.getUUID(), now + 2400); // at most one offer per player every two minutes
-        String text = switch (a) {
-            case FAN -> "Whoa, you're hurt! Come here, let me patch you up in my tummy!";
-            case FEARFUL -> "Um... you look hurt. Would you like to rest inside me for a bit? I'll be careful...";
-            case NEUTRAL -> "You look hurt. Would you like to rest in my tummy until you feel better?";
-        };
+        String text = trait.comfortOfferLine();
         MutableComponent accept = Component.literal("[Accept]").withStyle(Style.EMPTY
                 .withColor(net.minecraft.ChatFormatting.GREEN).withBold(true)
                 .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/gulp comfort accept"))

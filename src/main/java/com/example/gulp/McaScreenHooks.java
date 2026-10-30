@@ -209,6 +209,8 @@ public final class McaScreenHooks {
         }
         if (info == null) return;
         String kind = info.type == 2 ? "Pred" : info.type == 1 ? "Prey" : "Normal";
+        VillagerTrait trait = VillagerTrait.byId(info.trait);
+        if (trait != VillagerTrait.NONE) kind += " (" + trait.label.toLowerCase(java.util.Locale.ROOT) + ")";
         int typeY = e.getScreen().height - BOTTOM_DY;
         int boxW = box(g, font, "Type: " + kind, LEFT_X, typeY);
         // every villager has a level (1 to 10) and a bar

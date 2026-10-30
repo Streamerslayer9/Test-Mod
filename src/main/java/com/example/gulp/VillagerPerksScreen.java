@@ -119,8 +119,12 @@ public class VillagerPerksScreen extends Screen {
             int level = info.level;
             boolean max = level >= VillagerHolding.MAX_LEVEL;
             g.drawString(font, "Level " + level + (max ? " (max)" : ""), x + 8, y + 24, 0xE6C84A, false);
+            VillagerTrait trait = VillagerTrait.byId(info.trait);
             if (info.type != 2) {
                 String note = "Comfort perks work for preds only";
+                g.drawString(font, note, x + W - 8 - font.width(note), y + 24, 0x999999, false);
+            } else if (trait != VillagerTrait.NONE) {
+                String note = trait.label + " pred";
                 g.drawString(font, note, x + W - 8 - font.width(note), y + 24, 0x999999, false);
             }
             int bx = x + 8;
@@ -133,13 +137,13 @@ public class VillagerPerksScreen extends Screen {
             if (!max) g.drawString(font, info.xp + " / " + info.xpNeeded + " XP to the next level", bx, by + 10, 0x999999, false);
 
             int row = y + 56;
-            String healNext = max ? "At the top level." : "Next level: " + num(VillagerHolding.healPerSecond(level + 1)) + " HP per second.";
+            String healNext = max ? "At the top level." : "Next level: " + num(VillagerHolding.healPerSecond(level + 1, trait)) + " HP per second.";
             perkRow(g, x, row, "Healing touch",
-                    "Heals you " + num(VillagerHolding.healPerSecond(level)) + " HP every second.", healNext, true);
+                    "Heals you " + num(VillagerHolding.healPerSecond(level, trait)) + " HP every second.", healNext, true);
 
-            String holdNext = max ? "At the top level." : "Next level: " + (VillagerHolding.maxTicks(level + 1) / 20) + " seconds.";
+            String holdNext = max ? "At the top level." : "Next level: " + (VillagerHolding.maxTicks(level + 1, trait) / 20) + " seconds.";
             perkRow(g, x, row + ROW_STEP, "Long embrace",
-                    "Holds you for up to " + (VillagerHolding.maxTicks(level) / 20) + " seconds.", holdNext, true);
+                    "Holds you for up to " + (VillagerHolding.maxTicks(level, trait) / 20) + " seconds.", holdNext, true);
 
             boolean feeds = level >= FEED_LEVEL;
             perkRow(g, x, row + 2 * ROW_STEP, "Feeding",
