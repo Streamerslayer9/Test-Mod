@@ -44,7 +44,7 @@ public final class McaScreenHooks {
     private static final int PERKS_GAP = 3; // between the Perks button and Talk
 
     /** Shows a red diagnostic line on every screen that looks like MCA's (and logs every init). Set to false when it's sorted out. */
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
     private static String debugLine = "";
     private static Screen debugScreen;
 
@@ -177,6 +177,7 @@ public final class McaScreenHooks {
         perksButton.setWidth(bw);
         perksButton.setX(talk.getX() - bw - PERKS_GAP);
         perksButton.setY(talk.getY());
+        perksButton.setHeight(talk.getHeight());
         perksButton.visible = mainMenu || DEBUG;
         dbg(screen, "anchored to Talk at " + talk.getX() + "," + talk.getY() + " | " + total + " widgets, " + right.size() + " right, mainMenu=" + mainMenu);
     }
