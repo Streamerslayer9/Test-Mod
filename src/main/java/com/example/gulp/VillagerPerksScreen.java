@@ -10,15 +10,32 @@ import java.util.Locale;
 /**
  * A pred villager's perks, opened from the Perks button on the MCA villager screen. Read only: the villager levels up by
  * comforting players (see VillagerHolding) and the perks below come with the level.
+ * Page 1 is the real perks. When PREVIEW_PERKS is on, pages 2 and 3 show made-up placeholder perks that do nothing at all:
+ * they exist only so the layout can be looked at, and need no server or save data. Turn PREVIEW_PERKS off to remove them.
  */
 public class VillagerPerksScreen extends Screen {
     private static final int W = 270;
     private static final int H = 196;
     private static final int FEED_LEVEL = 5; // the level that starts feeding the player (see VillagerHolding.tick)
+    private static final int ROW_H = 32;
+    private static final int ROW_STEP = 35;
+
+    /** Preview only: show the placeholder pages below. They have no effect in the game. */
+    private static final boolean PREVIEW_PERKS = true;
+    // name, description, unlock text; three per page
+    private static final String[][] DUMMY = {
+            {"Soothing aura", "Placeholder: calms nearby villagers.", "Unlocks at level 2."},
+            {"Warm lullaby", "Placeholder: helps you rest faster.", "Unlocks at level 3."},
+            {"Gentle grip", "Placeholder: struggling hurts less.", "Unlocks at level 4."},
+            {"Bottomless belly", "Placeholder: holds more at once.", "Unlocks at level 6."},
+            {"Second wind", "Placeholder: refills your stamina.", "Unlocks at level 7."},
+            {"Lucky charm", "Placeholder: better loot from gifts.", "Unlocks at level 8."},
+    };
 
     private final Screen parent;
     private final int entityId;
     private final String villagerName;
+    private int page; // 0 = real perks, 1 and 2 = preview placeholders
 
     public VillagerPerksScreen(Screen parent, int entityId, String villagerName) {
         super(Component.literal("Villager perks"));
@@ -39,6 +56,16 @@ public class VillagerPerksScreen extends Screen {
                 .bounds(x + 8, y + H - 28, 60, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Close"), btn -> this.minecraft.setScreen(null))
                 .bounds(x + W - 68, y + H - 28, 60, 20).build());
+        if (PREVIEW_PERKS) {
+            addRenderableWidget(Button.builder(Component.literal("<"), btn -> page = Math.max(0, page - 1))
+                    .bounds(x + W / 2 - 24, y + H - 28, 20, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(">"), btn -> page = Math.min(pageCount() - 1, page + 1))
+                    .bounds(x + W / 2 + 4, y + H - 28, 20, 20).build());
+        }
+    }
+
+    private int pageCount() {
+        return PREVIEW_PERKS ? 1 + DUMMY.length / 3 : 1;
     }
 
     @Override
@@ -56,10 +83,10 @@ public class VillagerPerksScreen extends Screen {
     }
 
     private void perkRow(GuiGraphics g, int x, int y, String name, String line1, String line2, boolean unlocked) {
-        g.fill(x + 8, y, x + W - 8, y + 36, 0x40FFFFFF);
-        g.drawString(font, name, x + 14, y + 4, unlocked ? 0xFFFFFF : 0x888888, true);
-        g.drawString(font, line1, x + 14, y + 15, unlocked ? 0xBBBBBB : 0x777777, false);
-        g.drawString(font, line2, x + 14, y + 25, 0x888888, false);
+        g.fill(x + 8, y, x + W - 8, y + ROW_H, 0x40FFFFFF);
+        g.drawString(font, name, x + 14, y + 3, unlocked ? 0xFFFFFF : 0x888888, true);
+        g.drawString(font, line1, x + 14, y + 13, unlocked ? 0xBBBBBB : 0x777777, false);
+        g.drawString(font, line2, x + 14, y + 22, 0x888888, false);
     }
 
     @Override
@@ -77,7 +104,14 @@ public class VillagerPerksScreen extends Screen {
         g.drawString(font, villagerName + " - Perks", x + 8, y + 8, 0xFFFFFF, true);
 
         VillagerInfoPacket info = ClientVillagerInfo.get(entityId);
-        if (info == null) {
+        if (page > 0) {
+            g.drawString(font, "Preview perks (placeholders, they do nothing)", x + 8, y + 24, 0xE6C84A, false);
+            int row = y + 40;
+            for (int i = 0; i < 3; i++) {
+                String[] d = DUMMY[(page - 1) * 3 + i];
+                perkRow(g, x, row + i * ROW_STEP, d[0], d[1], d[2], false);
+            }
+        } else if (info == null) {
             g.drawString(font, "Loading...", x + 8, y + 28, 0xAAAAAA, false);
         } else if (info.type != 2) {
             g.drawString(font, "Only pred villagers have perks.", x + 8, y + 28, 0xAAAAAA, false);
@@ -94,21 +128,25 @@ public class VillagerPerksScreen extends Screen {
             g.fill(bx, by, bx + (int) (bw * frac), by + 6, 0xFFE6C84A);
             if (!max) g.drawString(font, info.xp + " / " + info.xpNeeded + " XP to the next level", bx, by + 10, 0x999999, false);
 
-            int row = y + 62;
+            int row = y + 56;
             String healNext = max ? "At the top level." : "Next level: " + num(VillagerHolding.healPerSecond(level + 1)) + " HP per second.";
             perkRow(g, x, row, "Healing touch",
                     "Heals you " + num(VillagerHolding.healPerSecond(level)) + " HP every second.", healNext, true);
 
             String holdNext = max ? "At the top level." : "Next level: " + (VillagerHolding.maxTicks(level + 1) / 20) + " seconds.";
-            perkRow(g, x, row + 40, "Long embrace",
+            perkRow(g, x, row + ROW_STEP, "Long embrace",
                     "Holds you for up to " + (VillagerHolding.maxTicks(level) / 20) + " seconds.", holdNext, true);
 
             boolean feeds = level >= FEED_LEVEL;
-            perkRow(g, x, row + 80, "Feeding",
+            perkRow(g, x, row + 2 * ROW_STEP, "Feeding",
                     feeds ? "Restores a little hunger while holding you." : "Unlocks at level " + FEED_LEVEL + ".",
                     "Each finished comfort earns the villager XP.", feeds);
         }
 
+        if (PREVIEW_PERKS) {
+            String label = (page + 1) + " / " + pageCount();
+            g.drawCenteredString(font, label, left() + W / 2, top() + H - 37, 0x999999);
+        }
         super.render(g, mouseX, mouseY, partialTick);
     }
 }
