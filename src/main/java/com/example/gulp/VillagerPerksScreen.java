@@ -9,8 +9,9 @@ import java.util.Locale;
 
 /**
  * A villager's perks, opened from the Perks button on the MCA villager screen (every villager has one). Read only: every
- * villager has a level, and for now only pred villagers earn XP, by comforting players (see VillagerHolding); how the others
- * level up is still to come. The comfort perks below come with the level and only do anything for pred villagers.
+ * villager has a level and every adult villager earns XP: from talking, gifts and rides in a stomach (see VillagerXp) and,
+ * for preds, from comforting players (see VillagerHolding). The comfort perks below come with the level and only do
+ * anything for pred villagers.
  * Page 1 is the real perks. When PREVIEW_PERKS is on, pages 2 and 3 show made-up placeholder perks that do nothing at all:
  * they exist only so the layout can be looked at, and need no server or save data. Turn PREVIEW_PERKS off to remove them.
  */
@@ -143,7 +144,7 @@ public class VillagerPerksScreen extends Screen {
             boolean feeds = level >= FEED_LEVEL;
             perkRow(g, x, row + 2 * ROW_STEP, "Feeding",
                     feeds ? "Restores a little hunger while holding you." : "Unlocks at level " + FEED_LEVEL + ".",
-                    "Each finished comfort earns the villager XP.", feeds);
+                    "XP: talking, gifts, rides and comforting.", feeds);
         }
 
         if (PREVIEW_PERKS) {

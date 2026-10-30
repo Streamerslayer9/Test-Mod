@@ -134,7 +134,10 @@ public final class ServerEvents {
         if (e.getLevel().isClientSide() || e.getHand() != InteractionHand.MAIN_HAND) return;
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         Component refusal = McaIntegration.refusal(p, target);
-        if (refusal == null) return;
+        if (refusal == null) {
+            VillagerXp.onInteract(p, target); // talking and gifts start with this right-click
+            return;
+        }
         if (McaIntegration.shouldTell(p)) StomachLogic.say(p, refusal);
         e.setCanceled(true);
         e.setCancellationResult(InteractionResult.SUCCESS);
@@ -148,6 +151,7 @@ public final class ServerEvents {
         if (server != null && server.getTickCount() % 10 == 0) McaIntegration.tickScared(server);
         if (server != null && server.getTickCount() % 100 == 0) McaIntegration.tickAffection(server);
         if (server != null && server.getTickCount() % 100 == 20) McaIntegration.tickComfort(server);
+        if (server != null && server.getTickCount() % 20 == 5) VillagerXp.tick(server);
         // Re-send the role list every 5 seconds (tiny packet): a player who joined, or whose client built a name tag before the
         // list arrived, always catches up. This is what makes the badges reliable in multiplayer.
         if (server != null && server.getTickCount() % 100 == 50) RolesPacket.broadcast(server);

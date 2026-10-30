@@ -28,8 +28,8 @@ import java.util.UUID;
  * once if the villager is hurt, dies or goes away, or when the player logs out or the server stops.
  * Struggle (R) rubs the walls: it raises the villager's hearts a little (not more than once every 20 seconds).
  *
- * Comforting levels the villager up (saved on the villager itself): every finished comfort gives them XP, and each
- * level (1 to 10) heals faster (+0.25 HP/s), holds a little longer (+6 s) and, from level 5, also feeds the player.
+ * Comforting levels the villager up (saved on the villager itself; talking, gifts and rides give XP too, see VillagerXp):
+ * every finished comfort gives them XP, and each level (1 to 10) heals faster (+0.25 HP/s), holds a little longer (+6 s) and, from level 5, also feeds the player.
  */
 public final class VillagerHolding {
     private VillagerHolding() { }
@@ -58,25 +58,45 @@ public final class VillagerHolding {
     /** How long one comfort can last at this level, in ticks: a minute at level 1, 6 seconds longer for every level after. */
     static int maxTicks(int level) { return (60 + 6 * (level - 1)) * 20; }
 
-    /** A finished comfort: the villager earns XP for the HP they healed, and may level up (the player is told). */
+    /** A finished comfort: the villager earns XP for the HP they healed. Comforting is never capped. */
     private static void awardXp(Entity villager, ServerPlayer p, float healed) {
+        addXp(villager, p, 10 + Math.round(healed), false);
+    }
+
+    /**
+     * Gives a villager XP and levels them up when it is enough (the player is told). Every villager can earn it, but only
+     * adults: children never gain XP. Talking, gifts and rides are "capped" sources: together they give a villager at most
+     * mcaVillagerXpDailyCap XP per Minecraft day, so they can't be farmed. Comforting is not capped (it needs a hurt player).
+     * @return the XP actually given (0 when capped, maxed out or not allowed)
+     */
+    static int addXp(Entity villager, ServerPlayer p, int amount, boolean capped) {
+        if (amount <= 0 || McaIntegration.isProtectedChild(villager)) return 0;
         int level = levelOf(villager);
-        if (level >= MAX_LEVEL) return;
-        int xp = xpOf(villager) + 10 + Math.round(healed);
+        if (level >= MAX_LEVEL) return 0;
+        CompoundTag t = villager.getPersistentData().getCompound(KEY).copy();
+        if (capped) {
+            long day = villager.level().getDayTime() / 24000L;
+            int used = t.getLong("Day") == day ? t.getInt("DayXp") : 0;
+            amount = Math.min(amount, GulpServerConfig.MCA_VILLAGER_XP_DAILY_CAP.get() - used);
+            if (amount <= 0) return 0;
+            t.putLong("Day", day);
+            t.putInt("DayXp", used + amount);
+        }
+        int xp = xpOf(villager) + amount;
         boolean up = false;
         while (level < MAX_LEVEL && xp >= xpNeeded(level)) {
             xp -= xpNeeded(level);
             level++;
             up = true;
         }
-        CompoundTag t = new CompoundTag();
         t.putInt("Level", level);
         t.putInt("Xp", level >= MAX_LEVEL ? 0 : xp);
         villager.getPersistentData().put(KEY, t);
         if (up) {
             p.sendSystemMessage(Component.empty().append(villager.getName())
-                    .append(" got better at comforting (level " + level + ")."));
+                    .append(" levelled up (level " + level + ")."));
         }
+        return amount;
     }
 
     // ------------------------------------------------------------------ holding

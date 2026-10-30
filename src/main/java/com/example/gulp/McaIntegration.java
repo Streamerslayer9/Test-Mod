@@ -170,6 +170,16 @@ public final class McaIntegration {
         return e != null && villagerClass != null && villagerClass.isInstance(e);
     }
 
+    /** A living, adult MCA villager (checked every time: the age is read from MCA itself). Only these ever earn XP. */
+    static boolean isAdultVillager(Entity e) {
+        return active() && isVillager(e) && e instanceof LivingEntity le && le.isAlive() && !isProtectedChild(e);
+    }
+
+    /** The villager's hearts with this player (0 if it can't be read). */
+    static int heartsOf(Entity villager, Player player) {
+        return heartsWith(villager, player);
+    }
+
     // ------------------------------------------------------------------ reading a villager
 
     private static Object brainOf(Entity villager) throws ReflectiveOperationException {
@@ -325,6 +335,7 @@ public final class McaIntegration {
     /** A villager is let out. The ones who enjoy it get happier the longer the ride was. */
     public static void onRelease(ServerPlayer p, Stomach s, Entity released, int heldTicks) {
         if (!active() || !isVillager(released)) return;
+        if (!s.hard) VillagerXp.onRide(p, released, heldTicks); // a soft ride teaches a villager something
         remember(released, p.getUUID(), "gulp.released");
         if (heldTicks >= 1200) remember(released, p.getUUID(), "gulp.long_ride"); // a ride of a minute or more
         Attitude a = attitude(released);

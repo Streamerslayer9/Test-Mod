@@ -40,6 +40,8 @@ public final class GulpServerConfig {
     public static final ForgeConfigSpec.IntValue MCA_REQUEST_COOLDOWN_SECONDS;
     public static final ForgeConfigSpec.BooleanValue MCA_STATUS_MESSAGE;
     public static final ForgeConfigSpec.BooleanValue MCA_COMFORT_ENABLED;
+    public static final ForgeConfigSpec.BooleanValue MCA_VILLAGER_XP_ENABLED;
+    public static final ForgeConfigSpec.IntValue MCA_VILLAGER_XP_DAILY_CAP;
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -151,6 +153,13 @@ public final class GulpServerConfig {
                 .comment("A pred villager who likes you enough (mcaAffectionHearts) may offer to hold a hurt player in their tummy until they are healed.",
                         "Only players whose role is Prey or Both are ever asked, they have to press Accept, and they can climb out any time (soft mode only).")
                 .define("mcaComfortEnabled", true);
+        MCA_VILLAGER_XP_ENABLED = b
+                .comment("Adult MCA villagers earn XP (and levels) from talking to you, from gifts and from a ride in a stomach, not only from comforting.",
+                        "Children never earn XP.")
+                .define("mcaVillagerXpEnabled", true);
+        MCA_VILLAGER_XP_DAILY_CAP = b
+                .comment("The most XP one villager can earn per Minecraft day from talking, gifts and rides together (comforting is not counted).")
+                .defineInRange("mcaVillagerXpDailyCap", 30, 1, 1000);
         MCA_STATUS_MESSAGE = b
                 .comment("Test/dev helper: when a player joins, show a chat line saying whether this mod connected to Minecraft Comes Alive.",
                         "Set to false to turn it off once you've confirmed it works.")
