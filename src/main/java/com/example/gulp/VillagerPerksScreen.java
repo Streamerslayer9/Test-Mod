@@ -8,8 +8,9 @@ import net.minecraft.network.chat.Component;
 import java.util.Locale;
 
 /**
- * A pred villager's perks, opened from the Perks button on the MCA villager screen. Read only: the villager levels up by
- * comforting players (see VillagerHolding) and the perks below come with the level.
+ * A villager's perks, opened from the Perks button on the MCA villager screen (every villager has one). Read only: every
+ * villager has a level, and for now only pred villagers earn XP, by comforting players (see VillagerHolding); how the others
+ * level up is still to come. The comfort perks below come with the level and only do anything for pred villagers.
  * Page 1 is the real perks. When PREVIEW_PERKS is on, pages 2 and 3 show made-up placeholder perks that do nothing at all:
  * they exist only so the layout can be looked at, and need no server or save data. Turn PREVIEW_PERKS off to remove them.
  */
@@ -113,12 +114,14 @@ public class VillagerPerksScreen extends Screen {
             }
         } else if (info == null) {
             g.drawString(font, "Loading...", x + 8, y + 28, 0xAAAAAA, false);
-        } else if (info.type != 2) {
-            g.drawString(font, "Only pred villagers have perks.", x + 8, y + 28, 0xAAAAAA, false);
         } else {
             int level = info.level;
             boolean max = level >= VillagerHolding.MAX_LEVEL;
-            g.drawString(font, "Comfort level " + level + (max ? " (max)" : ""), x + 8, y + 24, 0xE6C84A, false);
+            g.drawString(font, "Level " + level + (max ? " (max)" : ""), x + 8, y + 24, 0xE6C84A, false);
+            if (info.type != 2) {
+                String note = "Comfort perks work for preds only";
+                g.drawString(font, note, x + W - 8 - font.width(note), y + 24, 0x999999, false);
+            }
             int bx = x + 8;
             int by = y + 36;
             int bw = W - 16;
