@@ -43,6 +43,11 @@ public final class McaScreenHooks {
     private static final int BAR_H = 5;     // the bar is as wide as the Type box (see onRender), this is how tall
     private static final int PERKS_GAP = 3; // between the Perks button and Talk
 
+    /** Shows a red diagnostic line on every screen that looks like MCA's (and logs every init). Set to false when it's sorted out. */
+    private static final boolean DEBUG = true;
+    private static String debugLine = "";
+    private static Screen debugScreen;
+
     private static Screen shownScreen;
     private static LivingEntity villager;
     private static int topY;
@@ -70,52 +75,79 @@ public final class McaScreenHooks {
         return mc.crosshairPickEntity instanceof LivingEntity le ? le : null; // what you right-clicked
     }
 
+    private static void dbg(Screen screen, String msg) {
+        debugScreen = screen;
+        debugLine = msg;
+        if (DEBUG) LOGGER.info("[Gulp] perks-debug: {} (screen {})", msg, screen.getClass().getName());
+    }
+
     @SubscribeEvent
     public static void onInit(ScreenEvent.Init.Post e) {
         Screen screen = e.getScreen();
         if (!isInteractScreen(screen)) {
             if (screen == shownScreen) shownScreen = null;
+            String n = screen.getClass().getName().toLowerCase(java.util.Locale.ROOT);
+            if (DEBUG && n.contains("mca")) dbg(screen, "NOT matched as MCA villager screen: " + screen.getClass().getName());
             return;
         }
         Minecraft mc = Minecraft.getInstance();
         LivingEntity v = findVillager(screen, mc);
         shownScreen = null;
         perksButton = null;
-        if (v == null) return;
+        if (v == null) { dbg(screen, "FAIL: no villager found on screen"); return; }
         villager = v;
         shownScreen = screen;
         Net.send(20, v.getId()); // ask the server for their type and level
 
         // MCA's right-hand column of buttons, top to bottom: Talk, Interact, (room for ours), Family Tree
         List<AbstractWidget> right = new ArrayList<>();
+        int total = 0;
+        StringBuilder all = new StringBuilder();
         for (GuiEventListener l : e.getListenersList()) {
-            if (l instanceof AbstractWidget w && w.visible && w.getX() >= screen.width * 0.6) right.add(w);
+            if (l instanceof AbstractWidget w) {
+                total++;
+                if (all.length() < 150) all.append(w.getX()).append(',').append(w.getY()).append(w.visible ? "" : "(hid)").append(' ');
+                if (w.visible && w.getX() >= screen.width * 0.6) right.add(w);
+            }
         }
         right.sort(Comparator.comparingInt(AbstractWidget::getY));
-        if (!logged) { // once, so there is something to look at in latest.log if the layout is off
-            logged = true;
-            LOGGER.info("[Gulp] MCA villager screen {}: villager '{}', {} buttons on the right, window {}x{}", screen.getClass().getName(),
-                    v.getName().getString(), right.size(), screen.width, screen.height);
-        }
-        if (right.size() < 2) return;
-        AbstractWidget talk = right.get(0);
-        AbstractWidget interact = right.get(1);
-        topY = talk.getY();
-        int step = interact.getY() - talk.getY();
-        // only on the main menu, which has a big gap above the last button (Family Tree); the sub-menus are evenly spaced
+        if (DEBUG) LOGGER.info("[Gulp] perks-debug: widgets {} window {}x{} right-side {} :: {}", total, screen.width, screen.height, right.size(), all);
+
+        int bx, by, bw, bh;
+        String why;
         boolean mainMenu = false;
-        for (int i = 1; i < right.size(); i++) {
-            if (right.get(i).getY() - right.get(i - 1).getY() >= step * 2) mainMenu = true;
+        int step = 0;
+        if (right.size() >= 2) {
+            AbstractWidget talk = right.get(0);
+            step = right.get(1).getY() - talk.getY();
+            topY = talk.getY();
+            for (int i = 1; i < right.size(); i++) {
+                if (right.get(i).getY() - right.get(i - 1).getY() >= step * 2) mainMenu = true;
+            }
+            bw = talk.getWidth() * 3 / 4;
+            bx = talk.getX() - bw - PERKS_GAP;
+            by = talk.getY();
+            bh = talk.getHeight();
+            why = mainMenu ? "OK: anchored to Talk" : "sub-menu (no big gap): button hidden";
+        } else {
+            // couldn't find MCA's buttons: put it somewhere visible anyway so it can be seen
+            bw = 60; bh = 20;
+            bx = screen.width / 2 + 40;
+            by = screen.height / 2 - 60;
+            mainMenu = true;
+            why = "FALLBACK: only " + right.size() + " right-side buttons of " + total + " widgets";
         }
-        if (mainMenu && step > 0) {
-            int width = talk.getWidth() * 3 / 4;
+        if (DEBUG && mainMenu == false) why += " (forcing it anyway for debugging)";
+        if (mainMenu || DEBUG) {
             int id = v.getId();
             String name = v.getName().getString();
             perksButton = Button.builder(Component.literal("Perks"),
                             btn -> mc.setScreen(new VillagerPerksScreen(screen, id, name)))
-                    .bounds(talk.getX() - width - PERKS_GAP, talk.getY(), width, talk.getHeight()).build();
+                    .bounds(bx, by, bw, bh).build();
             e.addListener(perksButton);
         }
+        dbg(screen, why + " | widgets=" + total + " right=" + right.size() + " win=" + screen.width + "x" + screen.height
+                + " btn@" + bx + "," + by);
     }
 
     /** Draws the dark purple label box and returns its width. */
@@ -132,6 +164,9 @@ public final class McaScreenHooks {
 
     @SubscribeEvent
     public static void onRender(ScreenEvent.Render.Post e) {
+        if (DEBUG && e.getScreen() == debugScreen && !debugLine.isEmpty()) {
+            e.getGuiGraphics().drawString(Minecraft.getInstance().font, "[Gulp debug] " + debugLine, 4, 4, 0xFF5555, true);
+        }
         if (e.getScreen() != shownScreen || villager == null) return;
         VillagerInfoPacket info = ClientVillagerInfo.get(villager.getId());
         Font font = Minecraft.getInstance().font;
