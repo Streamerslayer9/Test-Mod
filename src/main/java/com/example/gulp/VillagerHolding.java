@@ -1,5 +1,6 @@
 package com.example.gulp;
 
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -26,18 +27,66 @@ import java.util.UUID;
  * and is let out when they are healed, after a minute, or the moment they press Release (G). They are also let out at
  * once if the villager is hurt, dies or goes away, or when the player logs out or the server stops.
  * Struggle (R) rubs the walls: it raises the villager's hearts a little (not more than once every 20 seconds).
+ *
+ * Comforting levels the villager up (saved on the villager itself): every finished comfort gives them XP, and each
+ * level (1 to 10) heals faster (+0.25 HP/s), holds a little longer (+6 s) and, from level 5, also feeds the player.
  */
 public final class VillagerHolding {
     private VillagerHolding() { }
 
-    private static final int MAX_TICKS = 60 * 20; // a minute at most
     private static final int RUB_COOLDOWN = 20 * 20;
+    private static final int MAX_LEVEL = 10;
+    private static final String KEY = "gulp_comfort"; // saved on the villager: Level and Xp
+
+    // ------------------------------------------------------------------ the villager's comfort level
+
+    /** The villager's comfort level, 1 to 10 (everyone starts at 1). */
+    static int levelOf(Entity villager) {
+        int level = villager.getPersistentData().getCompound(KEY).getInt("Level");
+        return Math.max(1, Math.min(MAX_LEVEL, level));
+    }
+
+    private static int xpOf(Entity villager) {
+        return villager.getPersistentData().getCompound(KEY).getInt("Xp");
+    }
+
+    private static int xpNeeded(int level) { return 30 + 20 * level; }
+
+    /** HP healed every second at this level. */
+    static float healPerSecond(int level) { return 1.0f + 0.25f * (level - 1); }
+
+    /** How long one comfort can last at this level, in ticks: a minute at level 1, 6 seconds longer for every level after. */
+    static int maxTicks(int level) { return (60 + 6 * (level - 1)) * 20; }
+
+    /** A finished comfort: the villager earns XP for the HP they healed, and may level up (the player is told). */
+    private static void awardXp(Entity villager, ServerPlayer p, float healed) {
+        int level = levelOf(villager);
+        if (level >= MAX_LEVEL) return;
+        int xp = xpOf(villager) + 10 + Math.round(healed);
+        boolean up = false;
+        while (level < MAX_LEVEL && xp >= xpNeeded(level)) {
+            xp -= xpNeeded(level);
+            level++;
+            up = true;
+        }
+        CompoundTag t = new CompoundTag();
+        t.putInt("Level", level);
+        t.putInt("Xp", level >= MAX_LEVEL ? 0 : xp);
+        villager.getPersistentData().put(KEY, t);
+        if (up) {
+            p.sendSystemMessage(Component.empty().append(villager.getName())
+                    .append(" got better at comforting (level " + level + ")."));
+        }
+    }
+
+    // ------------------------------------------------------------------ holding
 
     private static final class Hold {
         final UUID villager;
         final int previousMode;
         int ticks;
         int rubCd;
+        float healed; // total HP given back, for the villager's XP
 
         Hold(UUID villager, int previousMode) {
             this.villager = villager;
@@ -77,10 +126,16 @@ public final class VillagerHolding {
             return;
         }
         if (p.getCamera() != v) p.setCamera(v); // pressing sneak would make a spectator stop looking through their eyes
-        if (h.ticks % 20 == 0) p.heal(1.0f);
+        int level = levelOf(v);
+        if (h.ticks % 20 == 0) {
+            float before = p.getHealth();
+            p.heal(healPerSecond(level));
+            h.healed += Math.max(0f, p.getHealth() - before);
+            if (level >= 5) p.getFoodData().eat(1, 0.2f); // a well-practised villager feeds you too
+        }
         if (p.getHealth() >= p.getMaxHealth()) {
             release(p, "All better. You were let out.", true);
-        } else if (h.ticks >= MAX_TICKS) {
+        } else if (h.ticks >= maxTicks(level)) {
             release(p, "You were let out.", true);
         }
     }
@@ -129,7 +184,10 @@ public final class VillagerHolding {
                 z = villager.getZ();
             }
             p.teleportTo(w, x, y, z, villager.getYRot() + 180f, 0f);
-            if (thanked) McaIntegration.addHearts(villager, p, 2);
+            if (thanked) {
+                McaIntegration.addHearts(villager, p, 2);
+                awardXp(villager, p, h.healed);
+            }
         }
         Net.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), new HeldPacket(0, "", 0f, 0f));
         p.sendSystemMessage(Component.literal(message));

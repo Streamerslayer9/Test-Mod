@@ -645,6 +645,11 @@ public final class McaIntegration {
     private static final Map<UUID, Long> COMFORT_VILLAGER_COOLDOWN = new HashMap<>();
     private static final Map<UUID, Long> COMFORT_PLAYER_COOLDOWN = new HashMap<>();
 
+    /** " | comfort lv 3" for pred villagers (they are the ones who comfort), nothing for the rest. */
+    private static String comfortNote(Entity villager) {
+        return voreTypeOf(villager) == VoreType.PRED ? " | comfort lv " + VillagerHolding.levelOf(villager) : "";
+    }
+
     /** Changes a villager's hearts with a player (used when a villager has held someone). */
     static void addHearts(Entity villager, ServerPlayer player, int hearts) {
         if (active() && isVillager(villager)) reward(villager, player, hearts);
@@ -743,7 +748,7 @@ public final class McaIntegration {
                 break;
             }
             p.sendSystemMessage(Component.literal("- ").append(e.getName()).append(
-                    " | " + voreKind(e) + " | hearts " + heartsWith(e, p) + " | " + Math.round(p.distanceTo(e)) + " blocks"
+                    " | " + voreKind(e) + comfortNote(e) + " | hearts " + heartsWith(e, p) + " | " + Math.round(p.distanceTo(e)) + " blocks"
                     + (isProtectedChild(e) ? " | child" : "")));
         }
     }
@@ -778,7 +783,7 @@ public final class McaIntegration {
             int need = GulpServerConfig.MCA_AFFECTION_HEARTS.get();
             Attitude a = attitude(le);
             p.sendSystemMessage(Component.literal("Nearest: ").append(le.getName()).append(
-                    " | personality " + personalityOf(le) + " (" + a + ") | kind " + voreKind(le) + " | hearts " + hearts + " (needs " + need + ")"
+                    " | personality " + personalityOf(le) + " (" + a + ") | kind " + voreKind(le) + comfortNote(le) + " | hearts " + hearts + " (needs " + need + ")"
                     + " | child: " + isProtectedChild(le)));
             if (isProtectedChild(le)) why.add("They are a child: never asked, never swallowed.");
             VoreType type = voreTypeOf(le);
