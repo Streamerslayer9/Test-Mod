@@ -645,6 +645,21 @@ public final class McaIntegration {
     private static final Map<UUID, Long> COMFORT_VILLAGER_COOLDOWN = new HashMap<>();
     private static final Map<UUID, Long> COMFORT_PLAYER_COOLDOWN = new HashMap<>();
 
+    /** The MCA villager screen asked (action 20): tell that player this villager's type and comfort level. */
+    static void sendVillagerInfo(ServerPlayer p, int entityId) {
+        if (!active()) return;
+        Entity e = p.level().getEntity(entityId);
+        if (e == null || !isVillager(e) || p.distanceToSqr(e) > 32.0 * 32.0) return;
+        int type = switch (voreTypeOf(e)) {
+            case NORMAL -> 0;
+            case PREY -> 1;
+            case PRED -> 2;
+        };
+        int level = VillagerHolding.levelOf(e);
+        net.minecraftforge.network.PacketDistributor.PacketTarget target = net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> p);
+        Net.CHANNEL.send(target, new VillagerInfoPacket(entityId, type, level, VillagerHolding.xpOf(e), VillagerHolding.xpNeeded(level)));
+    }
+
     /** " | comfort lv 3" for pred villagers (they are the ones who comfort), nothing for the rest. */
     private static String comfortNote(Entity villager) {
         return voreTypeOf(villager) == VoreType.PRED ? " | comfort lv " + VillagerHolding.levelOf(villager) : "";

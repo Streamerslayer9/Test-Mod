@@ -24,6 +24,7 @@ public final class ClientForgeEvents {
     @SubscribeEvent
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut e) {
         ClientState.reset();
+        ClientVillagerInfo.clear();
         choicePrompted = false;
         CpmDriver.reset();
         ScreenLoop.stop();

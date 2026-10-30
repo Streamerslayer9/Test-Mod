@@ -35,7 +35,7 @@ public final class VillagerHolding {
     private VillagerHolding() { }
 
     private static final int RUB_COOLDOWN = 20 * 20;
-    private static final int MAX_LEVEL = 10;
+    static final int MAX_LEVEL = 10;
     private static final String KEY = "gulp_comfort"; // saved on the villager: Level and Xp
 
     // ------------------------------------------------------------------ the villager's comfort level
@@ -46,11 +46,11 @@ public final class VillagerHolding {
         return Math.max(1, Math.min(MAX_LEVEL, level));
     }
 
-    private static int xpOf(Entity villager) {
+    static int xpOf(Entity villager) {
         return villager.getPersistentData().getCompound(KEY).getInt("Xp");
     }
 
-    private static int xpNeeded(int level) { return 30 + 20 * level; }
+    static int xpNeeded(int level) { return 30 + 20 * level; }
 
     /** HP healed every second at this level. */
     static float healPerSecond(int level) { return 1.0f + 0.25f * (level - 1); }

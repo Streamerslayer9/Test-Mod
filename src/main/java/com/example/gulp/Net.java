@@ -9,7 +9,7 @@ import java.util.Optional;
 
 /** Network channel + the three packets: action (client->server), sync and belly (server->client). */
 public final class Net {
-    private static final String PROTOCOL = "3"; // 3: the stomach sync carries the swallowing system and whether the server has Flamevore, so old and new versions refuse to connect
+    private static final String PROTOCOL = "4"; // 4: villager info packet (3: swallowing system in the sync), so old and new versions refuse to connect
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(Gulp.ID, "main"), () -> PROTOCOL, PROTOCOL::equals, PROTOCOL::equals);
 
@@ -35,6 +35,8 @@ public final class Net {
                 HeldPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         CHANNEL.registerMessage(id++, RolesPacket.class, RolesPacket::encode, RolesPacket::decode,
                 RolesPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(id++, VillagerInfoPacket.class, VillagerInfoPacket::encode, VillagerInfoPacket::decode,
+                VillagerInfoPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
     }
 
     /** Client -> server: an action with no argument. */

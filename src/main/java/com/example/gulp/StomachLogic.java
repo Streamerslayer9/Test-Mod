@@ -176,6 +176,7 @@ public final class StomachLogic {
                     StomachItems.digestSlot(p, s, view, arg & 0xFFFF, ((arg >> 16) & 1) != 0 ? 64 : 1);
                 }
             }
+            case 20 -> McaIntegration.sendVillagerInfo(p, arg); // the MCA villager screen asks for a villager's type and level
             case 19 -> {
                 // First-join choice / Settings: which mod does the swallowing (arg = SwallowSystem ordinal).
                 SwallowSystem choice = SwallowSystem.byId(arg);

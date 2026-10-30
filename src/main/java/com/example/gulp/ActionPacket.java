@@ -12,7 +12,8 @@ import java.util.function.Supplier;
  *  7 open stomach storage (or look at your swallower's) | 8 set role (arg = Role ordinal) | 9 swallow an inventory item
  *  10 digest the first storage slot | 11 struggle | 12 strip enchants | 13 transfer enchants | 14 dev level-up
  *  15 click an Enchant Stripper box | 16 destroy enchants | 17 instant digest button on/off | 18 right-click eat a storage slot
- *  19 set the swallowing system (arg = SwallowSystem ordinal: 1 Gulp, 2 Flamevore) */
+ *  19 set the swallowing system (arg = SwallowSystem ordinal: 1 Gulp, 2 Flamevore)
+ *  20 ask for a villager's type and comfort level (arg = villager entity id) */
 public class ActionPacket {
     private final int action;
     private final int arg;
