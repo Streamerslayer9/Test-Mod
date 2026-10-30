@@ -24,10 +24,10 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * Adds Gulp's bits to MCA's villager screen without touching MCA: a "Type: Pred" box and a comfort-level bar under the
- * villager's info on the left, and a Perks button between Interact and Family Tree on the right.
- * The positions are measured from MCA's own Talk / Interact buttons (nothing is hard-wired to the window size), so tweak the
- * three offsets below if the boxes land a little off. Anything unexpected on the screen just means nothing is added.
+ * Adds Gulp's bits to MCA's villager screen without touching MCA: a "Type: Pred" box and a comfort-level bar on the left
+ * under MCA's row of icons (clear of the info boxes and traits above them), and a Perks button just left of the Talk button.
+ * The positions are measured from MCA's own Talk / Interact buttons, so tweak the offsets below if they land a little off.
+ * Anything unexpected on the screen just means nothing is added.
  */
 @Mod.EventBusSubscriber(modid = Gulp.ID, value = Dist.CLIENT)
 public final class McaScreenHooks {
@@ -37,9 +37,10 @@ public final class McaScreenHooks {
     private static boolean logged;
 
     private static final int LEFT_X = 18;   // left edge of MCA's info boxes
-    private static final int TYPE_DY = 73;  // from the top of the right-hand buttons (Talk) down to our Type box
-    private static final int BAR_DY = 91;   // ... down to the level bar
+    private static final int TYPE_DY = 189; // from the top of the Talk button down to our Type box: under MCA's row of icons
+    private static final int BAR_DY = 19;   // from the Type box down to the level bar
     private static final int BAR_W = 100;
+    private static final int PERKS_GAP = 3; // between the Perks button and Talk
 
     private static Screen shownScreen;
     private static LivingEntity villager;
@@ -100,13 +101,18 @@ public final class McaScreenHooks {
         AbstractWidget interact = right.get(1);
         topY = talk.getY();
         int step = interact.getY() - talk.getY();
-        // only on the main menu: three buttons with a free slot between Interact and the last one
-        if (right.size() == 3 && step > 0 && right.get(2).getY() >= interact.getY() + step + interact.getHeight()) {
+        // only on the main menu, which has a big gap above the last button (Family Tree); the sub-menus are evenly spaced
+        boolean mainMenu = false;
+        for (int i = 1; i < right.size(); i++) {
+            if (right.get(i).getY() - right.get(i - 1).getY() >= step * 2) mainMenu = true;
+        }
+        if (mainMenu && step > 0) {
+            int width = talk.getWidth() * 3 / 4;
             int id = v.getId();
             String name = v.getName().getString();
             perksButton = Button.builder(Component.literal("Perks"),
                             btn -> mc.setScreen(new VillagerPerksScreen(screen, id, name)))
-                    .bounds(interact.getX(), interact.getY() + step, interact.getWidth(), interact.getHeight()).build();
+                    .bounds(talk.getX() - width - PERKS_GAP, talk.getY(), width, talk.getHeight()).build();
             perksButton.visible = false; // shown once the server says this villager is a pred
             perksButton.active = false;
             e.addListener(perksButton);
@@ -136,9 +142,10 @@ public final class McaScreenHooks {
         Font font = Minecraft.getInstance().font;
         GuiGraphics g = e.getGuiGraphics();
         String kind = info.type == 2 ? "Pred" : info.type == 1 ? "Prey" : "Normal";
-        box(g, font, "Type: " + kind, LEFT_X, topY + TYPE_DY);
+        int typeY = Math.min(topY + TYPE_DY, e.getScreen().height - 50); // stays on a small screen
+        box(g, font, "Type: " + kind, LEFT_X, typeY);
         if (pred) {
-            int by = topY + BAR_DY;
+            int by = typeY + BAR_DY;
             boolean max = info.level >= VillagerHolding.MAX_LEVEL;
             float frac = max ? 1f : Math.min(1f, info.xp / (float) Math.max(1, info.xpNeeded));
             g.fill(LEFT_X - 1, by - 1, LEFT_X + BAR_W + 1, by + 7, 0xFF000000);
