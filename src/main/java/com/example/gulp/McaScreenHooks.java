@@ -94,6 +94,7 @@ public final class McaScreenHooks {
         LivingEntity v = findVillager(screen, mc);
         shownScreen = null;
         perksButton = null;
+        lastRight = -1;
         if (v == null) { dbg(screen, "FAIL: no villager found on screen"); return; }
         villager = v;
         shownScreen = screen;
@@ -131,9 +132,9 @@ public final class McaScreenHooks {
             why = mainMenu ? "OK: anchored to Talk" : "sub-menu (no big gap): button hidden";
         } else {
             // couldn't find MCA's buttons: put it somewhere visible anyway so it can be seen
-            bw = 60; bh = 20;
-            bx = screen.width / 2 + 40;
-            by = screen.height / 2 - 60;
+            bw = 60; bh = 18;
+            bx = screen.width - 90 - PERKS_GAP - bw; // MCA's Talk sits at x = width - 90, y = 17, 80 wide (measured from a screenshot)
+            by = 17;
             mainMenu = true;
             why = "FALLBACK: only " + right.size() + " right-side buttons of " + total + " widgets";
         }
@@ -146,8 +147,38 @@ public final class McaScreenHooks {
                     .bounds(bx, by, bw, bh).build();
             e.addListener(perksButton);
         }
-        dbg(screen, why + " | widgets=" + total + " right=" + right.size() + " win=" + screen.width + "x" + screen.height
-                + " btn@" + bx + "," + by);
+        dbg(screen, why + " | " + total + " widgets at init");
+    }
+
+    private static int lastRight = -1;
+
+    /** MCA adds its buttons after the init event, so look again each frame and snap the Perks button to Talk once they exist. */
+    private static void reanchor(Screen screen) {
+        if (perksButton == null) return;
+        List<AbstractWidget> right = new ArrayList<>();
+        int total = 0;
+        for (GuiEventListener l : screen.children()) {
+            if (l instanceof AbstractWidget w && w != perksButton) {
+                total++;
+                if (w.visible && w.getX() >= screen.width * 0.6) right.add(w);
+            }
+        }
+        if (right.size() == lastRight) return; // nothing changed
+        lastRight = right.size();
+        if (right.size() < 2) { if (DEBUG) dbg(screen, "waiting: " + total + " widgets, " + right.size() + " on the right"); return; }
+        right.sort(Comparator.comparingInt(AbstractWidget::getY));
+        AbstractWidget talk = right.get(0);
+        int step = right.get(1).getY() - talk.getY();
+        boolean mainMenu = false;
+        for (int i = 1; i < right.size(); i++) {
+            if (right.get(i).getY() - right.get(i - 1).getY() >= step * 2) mainMenu = true;
+        }
+        int bw = talk.getWidth() * 3 / 4;
+        perksButton.setWidth(bw);
+        perksButton.setX(talk.getX() - bw - PERKS_GAP);
+        perksButton.setY(talk.getY());
+        perksButton.visible = mainMenu || DEBUG;
+        dbg(screen, "anchored to Talk at " + talk.getX() + "," + talk.getY() + " | " + total + " widgets, " + right.size() + " right, mainMenu=" + mainMenu);
     }
 
     /** Draws the dark purple label box and returns its width. */
@@ -168,6 +199,7 @@ public final class McaScreenHooks {
             e.getGuiGraphics().drawString(Minecraft.getInstance().font, "[Gulp debug] " + debugLine, 4, 4, 0xFF5555, true);
         }
         if (e.getScreen() != shownScreen || villager == null) return;
+        reanchor(e.getScreen());
         VillagerInfoPacket info = ClientVillagerInfo.get(villager.getId());
         Font font = Minecraft.getInstance().font;
         GuiGraphics g = e.getGuiGraphics();
